@@ -429,12 +429,9 @@ async function startScan() {
     // 兼容不同 Chrome 版本的事件绑定
     if (typeof scanBluetooth.addEventListener === 'function') {
       scanBluetooth.addEventListener('advertisementreceived', handleAdvertisement);
-    } else if (scanBluetooth.onadvertisementreceived !== undefined) {
-      scanBluetooth.onadvertisementreceived = handleAdvertisement;
     } else {
-      console.error('无法绑定: scan 对象不支持事件', scanBluetooth);
-      alert('当前浏览器不支持 BLE 扫描事件，请升级 Chrome');
-      return false;
+      // 旧版 Chrome：直接赋值回调属性
+      scanBluetooth.onadvertisementreceived = handleAdvertisement;
     }
     isScanning = true;
     updateScanUI();
