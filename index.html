@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RL_HT_Tag 温湿度采集（纯扫描·修正版）</title>
+    <title>RL_HT_Tag 温湿度（增强匹配）</title>
     <style>
+        /* 样式与之前相同，略 */
         * { box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -71,7 +72,7 @@
             border-radius: 8px;
             font-family: monospace;
             font-size: 12px;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-all;
@@ -114,8 +115,8 @@
 </head>
 <body>
 
-    <h1>📡 纯扫描 BLE 温湿度（修正版）</h1>
-    <div class="sub">RL_HT_Tag · 无需连接 GATT</div>
+    <h1>📡 纯扫描 BLE 温湿度（增强匹配）</h1>
+    <div class="sub">自动适配多种 Service Data UUID</div>
 
     <div class="warning">
         ⚠️ 需启用 Chrome 实验性功能：<br>
@@ -144,7 +145,7 @@
             <span class="value" id="rssi">-- dBm</span>
         </div>
         <div class="info-row" style="flex-direction:column; align-items:stretch;">
-            <span class="label">📋 Service Data (0x0318)</span>
+            <span class="label">📋 原始数据（十六进制）</span>
             <div class="raw" id="rawData">等待数据…</div>
         </div>
     </div>
@@ -173,8 +174,8 @@
     </div>
 
     <div class="note">
-        * 若仍扫描不到，建议直接使用下方 Python 脚本（100%可靠）。<br>
-        * Python 脚本只需安装 <code>bleak</code> 库，无需任何浏览器实验性功能。
+        * 若仍解析失败，请查看日志中打印的 Service Data UUID 列表，确认设备实际广播的 UUID。<br>
+        * 如始终无效，请使用 Python 脚本（下方提供），100% 可靠。
     </div>
 
     <script>
@@ -194,7 +195,6 @@
             let scanController = null;
             let isScanning = false;
 
-            // ---------- 日志 ----------
             function appendLog(msg, type = 'info') {
                 const timestamp = new Date().toLocaleTimeString();
                 const prefix = type === 'error' ? '❌' : (type === 'success' ? '✅' : 'ℹ️');
@@ -203,7 +203,7 @@
             }
             clearLogBtn.addEventListener('click', () => { logArea.textContent = ''; });
 
-            // ---------- 解析（按规格书） ----------
+            // ---------- 解析函数 ----------
             function parseTemperature(hexString) {
                 const clean = hexString.replace(/^0x/, '');
                 const padded = clean.length % 2 === 0 ? clean : '0' + clean;
@@ -241,7 +241,7 @@
                 const result = event;
                 appendLog('收到广播包', 'info');
 
-                // 打印原始数据（调试）
+                // 打印原始广播包（调试）
                 try {
                     const rawBytes = new Uint8Array(result.rawData.buffer);
                     let rawHex = '';
@@ -251,34 +251,58 @@
                     appendLog(`原始广播包: ${rawHex.trim()}`, 'info');
                 } catch (e) {}
 
-                const serviceData = result.serviceData;
-                if (!serviceData) {
-                    appendLog('无 Service Data', 'error');
-                    return;
-                }
-
-                // 查找 UUID 0x0318
-                const targetUUID = '00000318-0000-1000-8000-00805f9b34fb';
-                let dataView = null;
-                for (const [key, value] of serviceData) {
-                    if (key === targetUUID || key.includes('0318')) {
-                        dataView = value;
-                        appendLog(`找到 Service Data UUID: ${key}`, 'success');
-                        break;
-                    }
-                }
-                if (!dataView) {
-                    appendLog('未找到 Service Data 0x0318', 'error');
-                    return;
-                }
-
-                // 名称二次过滤
+                // 可选名称过滤
                 const filter = nameFilterInput.value.trim().toLowerCase();
                 const deviceName = result.name || '未知';
                 if (filter && !deviceName.toLowerCase().includes(filter)) {
                     appendLog(`设备名称 "${deviceName}" 不匹配过滤 "${filter}"，忽略`, 'info');
                     return;
                 }
+                deviceNameEl.textContent = deviceName;
+
+                // 查找 Service Data
+                const serviceData = result.serviceData;
+                if (!serviceData) {
+                    appendLog('无 Service Data', 'error');
+                    return;
+                }
+
+                // 打印所有 Service Data UUID
+                const uuids = Array.from(serviceData.keys());
+                appendLog(`Service Data UUID 列表: ${uuids.join(', ')}`, 'info');
+
+                // 尝试匹配常见的 UUID
+                let dataView = null;
+                let matchedUUID = null;
+                for (const [key, value] of serviceData) {
+                    // 匹配包含 0318 或 1803 的 UUID（不区分大小写）
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey.includes('0318') || lowerKey.includes('1803')) {
+                        dataView = value;
+                        matchedUUID = key;
+                        break;
+                    }
+                }
+
+                if (!dataView) {
+                    appendLog('未找到包含 0318 或 1803 的 Service Data', 'error');
+                    // 尝试从厂商数据中查找（兜底）
+                    const manufacturerData = result.manufacturerData;
+                    if (manufacturerData) {
+                        appendLog('尝试从厂商数据解析...', 'info');
+                        for (const [companyId, data] of manufacturerData) {
+                            // Apple iBeacon 公司 ID 为 0x004C
+                            if (companyId === 0x004C) {
+                                const bytes = new Uint8Array(data.buffer);
+                                // iBeacon 数据格式：类型(0x02) + 长度21字节
+                                // 但温湿度不在 iBeacon 中，忽略
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                appendLog(`匹配到 Service Data UUID: ${matchedUUID}`, 'success');
 
                 // 提取数据
                 const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
@@ -286,7 +310,7 @@
                 for (let i = 0; i < bytes.length; i++) {
                     hex += bytes[i].toString(16).padStart(2, '0');
                 }
-                appendLog(`Service Data (0x0318): 0x${hex.toUpperCase()}`, 'info');
+                appendLog(`Service Data 内容: 0x${hex.toUpperCase()}`, 'info');
 
                 let temp = null, humid = null;
                 try {
@@ -315,12 +339,10 @@
             // ---------- 开始/停止扫描 ----------
             async function toggleScan() {
                 if (isScanning) {
-                    // 停止
                     if (scanController) {
                         scanController.stop();
                         scanController = null;
                     }
-                    // 移除事件监听
                     navigator.bluetooth.removeEventListener('advertisementreceived', handleScanResult);
                     isScanning = false;
                     scanBtn.textContent = '🔍 开始扫描';
@@ -339,16 +361,12 @@
                         throw new Error('浏览器不支持 requestLEScan，请启用实验性 Web Platform Features 并重启 Chrome。');
                     }
 
-                    // 配置扫描选项：接收所有广播，持续接收重复包
                     const options = {
                         acceptAllAdvertisements: true,
                         keepRepeatedDevices: true
                     };
 
-                    // 启动扫描
                     scanController = await navigator.bluetooth.requestLEScan(options);
-                    
-                    // 将事件监听器添加到 navigator.bluetooth 上（而不是控制器）
                     navigator.bluetooth.addEventListener('advertisementreceived', handleScanResult);
 
                     isScanning = true;
@@ -393,8 +411,7 @@
                 appendLog('浏览器不支持 Web Bluetooth', 'error');
             } else {
                 appendLog('Web Bluetooth 可用，请点击“开始扫描”', 'info');
-                appendLog('提示：若扫描不到，请确认设备正在广播且名称过滤正确', 'info');
-                appendLog('如仍无效，请使用 Python 脚本（见下方说明）', 'info');
+                appendLog('提示：若无法解析，请查看日志中的 Service Data UUID 列表', 'info');
             }
         })();
     </script>
