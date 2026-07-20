@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>纯扫描 BLE 温湿度（无需连接）</title>
+    <title>RL_HT_Tag 温湿度采集（规格书版）</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 550px;
+            max-width: 600px;
             margin: 30px auto;
             padding: 20px;
-            background: #f7f9fc;
+            background: #f4f6f9;
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
@@ -18,18 +18,18 @@
         .card {
             background: white;
             border-radius: 12px;
-            padding: 18px;
-            margin-bottom: 18px;
+            padding: 16px;
+            margin-bottom: 16px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         .info-row {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
+            padding: 6px 0;
             border-bottom: 1px solid #eee;
         }
         .info-row:last-child { border-bottom: none; }
-        .label { color: #5a6c7d; font-weight: 500; }
+        .label { color: #5a6c7d; }
         .value { font-weight: 600; color: #0b2b44; }
         .value.temp { color: #d35400; }
         .value.humid { color: #2980b9; }
@@ -37,9 +37,8 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            margin: 12px 0;
+            margin: 10px 0;
         }
-        .input-group label { font-weight: 500; color: #1a3b5d; }
         .input-group input {
             flex: 1;
             padding: 8px 12px;
@@ -62,45 +61,59 @@
         }
         button:hover { background: #005bb5; }
         button:disabled { background: #a0b8cc; cursor: not-allowed; }
-        .status { text-align: center; color: #5a6c7d; font-size: 14px; margin-top: 12px; }
-        .raw {
-            word-break: break-all;
-            background: #f0f2f5;
+        .status { text-align: center; color: #5a6c7d; font-size: 14px; margin-top: 8px; }
+        .log-area {
+            background: #1e1e1e;
+            color: #d4d4d4;
             padding: 10px;
             border-radius: 8px;
             font-family: monospace;
-            font-size: 13px;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
             margin-top: 6px;
         }
-        .note { font-size: 13px; color: #7f8c8d; margin-top: 12px; text-align: center; }
-        .device-name { font-weight: 700; color: #007aff; }
-        .warning {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 10px;
+        .raw {
+            background: #f0f2f5;
+            padding: 8px;
             border-radius: 6px;
-            margin-bottom: 12px;
-            font-size: 14px;
+            font-family: monospace;
+            font-size: 13px;
+            margin-top: 4px;
+            word-break: break-all;
+        }
+        .note { font-size: 13px; color: #7f8c8d; text-align: center; margin-top: 10px; }
+        .device-name { color: #007aff; font-weight: 700; }
+        .spec-ref {
+            background: #eaf4ff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 8px 0;
+        }
+        .btn-sm {
+            width: auto;
+            padding: 6px 16px;
+            font-size: 13px;
+            background: #6c757d;
+            margin: 0;
         }
     </style>
 </head>
 <body>
 
-    <h1>📡 纯扫描 BLE 温湿度</h1>
-
-    <div class="warning">
-        ⚠️ 需启用 Chrome 实验性功能：<br>
-        <code>chrome://flags/#enable-experimental-web-platform-features</code> → 开启并重启。
-    </div>
+    <h1>🌡️ RL_HT_Tag 温湿度（规格书解析）</h1>
 
     <div class="card">
         <div class="info-row">
             <span class="label">📱 设备</span>
-            <span class="value device-name" id="deviceName">扫描中…</span>
+            <span class="value device-name" id="deviceName">未选择</span>
         </div>
         <div class="info-row">
             <span class="label">状态</span>
-            <span class="value" id="statusText">未开始</span>
+            <span class="value" id="statusText">未连接</span>
         </div>
         <div class="info-row">
             <span class="label">🌡️ 温度</span>
@@ -121,17 +134,37 @@
     </div>
 
     <div class="input-group">
-        <label for="nameFilter">设备名称包含：</label>
-        <input type="text" id="nameFilter" value="RL_HT" placeholder="可选过滤名称" />
+        <label for="namePrefix">设备名称前缀：</label>
+        <input type="text" id="namePrefix" value="RL_HT" placeholder="例如: RL_HT" />
     </div>
 
-    <button id="scanBtn">🔍 开始扫描</button>
-    <div class="status" id="statusDetail">点击开始扫描广播（无需连接）</div>
-    <div class="note">* 只会显示包含 Service Data 0x0318 的设备，温湿度数据自动解析。</div>
+    <button id="connectBtn">🔗 连接并监听广播</button>
+    <div class="status" id="statusDetail">点击按钮后，在弹窗中选择设备（按名称前缀过滤）</div>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:600; color:#1a3b5d;">📋 诊断日志</span>
+            <button id="clearLogBtn" class="btn-sm">清空</button>
+        </div>
+        <div class="log-area" id="logArea">[系统] 准备就绪，请点击连接。</div>
+    </div>
+
+    <div class="spec-ref">
+        📖 <strong>解析规则（依据产品规格书）</strong><br>
+        • 温度：字节0（00正/01负），字节1（整数），字节2（小数/100）<br>
+        • 湿度：字节3（整数），字节4（小数/100）<br>
+        • 示例：<code>0x001E4B375D64</code> → 温度 30.75℃, 湿度 55.93%
+    </div>
+
+    <div class="note">
+        * 如果扫描不到设备，请确认设备正在广播（用 nRF Connect 验证），<br>
+        并确保未与其他设备连接。可尝试修改名称前缀或清空后重新扫描。
+    </div>
 
     <script>
         (function() {
-            const scanBtn = document.getElementById('scanBtn');
+            // DOM 元素
+            const connectBtn = document.getElementById('connectBtn');
             const statusText = document.getElementById('statusText');
             const statusDetail = document.getElementById('statusDetail');
             const deviceNameEl = document.getElementById('deviceName');
@@ -139,12 +172,23 @@
             const humSpan = document.getElementById('humidity');
             const rssiSpan = document.getElementById('rssi');
             const rawSpan = document.getElementById('rawData');
-            const nameFilterInput = document.getElementById('nameFilter');
+            const namePrefixInput = document.getElementById('namePrefix');
+            const logArea = document.getElementById('logArea');
+            const clearLogBtn = document.getElementById('clearLogBtn');
 
-            let scanController = null;
-            let isScanning = false;
+            let device = null;
+            let watching = false;
 
-            // ---------- 解析函数 ----------
+            // ---------- 日志 ----------
+            function appendLog(msg, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const prefix = type === 'error' ? '❌' : (type === 'success' ? '✅' : 'ℹ️');
+                logArea.textContent += `[${timestamp}] ${prefix} ${msg}\n`;
+                logArea.scrollTop = logArea.scrollHeight;
+            }
+            clearLogBtn.addEventListener('click', () => { logArea.textContent = ''; });
+
+            // ---------- 解析（按规格书） ----------
             function parseTemperature(hexString) {
                 const clean = hexString.replace(/^0x/, '');
                 const padded = clean.length % 2 === 0 ? clean : '0' + clean;
@@ -177,11 +221,25 @@
                 rawSpan.textContent = rawHex ? '0x' + rawHex.toUpperCase() : '无数据';
             }
 
-            // ---------- 处理扫描到的广播 ----------
-            function handleScanResult(event) {
-                const result = event;
-                const serviceData = result.serviceData;
-                if (!serviceData) return;
+            // ---------- 处理广播 ----------
+            function handleAdvertisement(event) {
+                const adv = event;
+                appendLog('收到广播数据包', 'info');
+                // 输出完整广播包内容（调试用）
+                try {
+                    const rawBytes = new Uint8Array(adv.rawData.buffer);
+                    let rawHex = '';
+                    for (let i = 0; i < rawBytes.length; i++) {
+                        rawHex += rawBytes[i].toString(16).padStart(2, '0') + ' ';
+                    }
+                    appendLog(`完整广播包: ${rawHex.trim()}`, 'info');
+                } catch (e) {}
+
+                const serviceData = adv.serviceData;
+                if (!serviceData) {
+                    appendLog('广播中未包含 Service Data', 'error');
+                    return;
+                }
 
                 // 查找 UUID 0x0318
                 const targetUUID = '00000318-0000-1000-8000-00805f9b34fb';
@@ -189,16 +247,14 @@
                 for (const [key, value] of serviceData) {
                     if (key === targetUUID || key.includes('0318')) {
                         dataView = value;
+                        appendLog(`找到 Service Data UUID: ${key}`, 'success');
                         break;
                     }
                 }
-                if (!dataView) return; // 忽略不含 0x0318 的设备
-
-                // 可选名称过滤
-                const filter = nameFilterInput.value.trim().toLowerCase();
-                const deviceName = result.name || '未知';
-                if (filter && !deviceName.toLowerCase().includes(filter)) {
-                    return; // 名称不匹配，忽略
+                if (!dataView) {
+                    appendLog('未找到 Service Data 0x0318', 'error');
+                    rawSpan.textContent = '无匹配数据';
+                    return;
                 }
 
                 // 转十六进制
@@ -207,88 +263,537 @@
                 for (let i = 0; i < bytes.length; i++) {
                     hex += bytes[i].toString(16).padStart(2, '0');
                 }
+                appendLog(`Service Data (0x0318): 0x${hex.toUpperCase()}`, 'info');
 
                 let temp = null, humid = null;
-                try { temp = parseTemperature(hex); } catch (e) { /* 忽略解析错误 */ }
-                try { humid = parseHumidity(hex); } catch (e) { /* 忽略 */ }
+                try {
+                    temp = parseTemperature(hex);
+                    appendLog(`温度解析: ${temp.toFixed(2)} ℃`, 'success');
+                } catch (e) {
+                    appendLog(`温度解析失败: ${e.message}`, 'error');
+                }
+                try {
+                    humid = parseHumidity(hex);
+                    if (humid !== null) {
+                        appendLog(`湿度解析: ${humid.toFixed(1)} %`, 'success');
+                    } else {
+                        appendLog('湿度解析失败（数据不合理）', 'error');
+                    }
+                } catch (e) {
+                    appendLog(`湿度解析异常: ${e.message}`, 'error');
+                }
 
-                const rssi = result.rssi;
-                updateDisplay(temp, humid, rssi, hex, deviceName);
-                statusText.textContent = '扫描中';
+                const rssi = adv.rssi;
+                const name = adv.name || device.name || '未知设备';
+                updateDisplay(temp, humid, rssi, hex, name);
+                statusText.textContent = '接收数据中';
                 statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
             }
 
-            // ---------- 开始/停止扫描 ----------
-            async function toggleScan() {
-                if (isScanning) {
-                    // 停止扫描
-                    if (scanController) {
-                        scanController.stop();
-                        scanController = null;
+            // ---------- 连接/断开 ----------
+            async function connectAndRead() {
+                if (watching) {
+                    // 断开
+                    try {
+                        if (device && device.gatt) {
+                            await device.gatt.disconnect();
+                            appendLog('已断开连接', 'info');
+                        }
+                    } catch (e) {
+                        appendLog(`断开连接出错: ${e.message}`, 'error');
                     }
-                    isScanning = false;
-                    scanBtn.textContent = '🔍 开始扫描';
-                    statusText.textContent = '已停止';
-                    statusDetail.textContent = '扫描已停止';
+                    watching = false;
+                    device = null;
+                    statusText.textContent = '已断开';
+                    statusDetail.textContent = '点击按钮重新连接';
+                    connectBtn.textContent = '🔗 连接并监听广播';
+                    updateDisplay(null, null, null, null, '未选择');
                     return;
                 }
 
                 try {
-                    scanBtn.disabled = true;
-                    statusDetail.textContent = '正在请求扫描…';
+                    connectBtn.disabled = true;
+                    statusDetail.textContent = '正在扫描设备…';
+                    const prefix = namePrefixInput.value.trim();
+                    appendLog(`开始扫描，名称前缀: "${prefix || '无'}"`, 'info');
 
-                    // 检查实验性 API
-                    if (!navigator.bluetooth || !navigator.bluetooth.requestLEScan) {
-                        throw new Error('当前浏览器不支持 requestLEScan，请启用实验性 Web Platform Features 并重启 Chrome。');
+                    let filters = [];
+                    if (prefix) {
+                        filters = [{ namePrefix: prefix }];
+                    } else {
+                        // 若无前缀，尝试按服务UUID过滤（但设备可能无标准服务，所以不推荐）
+                        // 这里我们允许用户清空前缀来显示所有设备，但可能看不到仅广播Service Data的设备。
+                        // 所以我们还是使用 acceptAllDevices 并添加 optionalServices 尽量显示。
+                        // 但为了增加可见性，我们仍然尝试 services 过滤，但可能无效。
+                        // 最安全：提示用户使用前缀。
+                        appendLog('未设置名称前缀，可能无法发现仅广播Service Data的设备', 'error');
+                        // 仍然尝试 acceptAllDevices
                     }
 
-                    // 请求扫描，只扫描包含 Service Data 0x0318 的设备（但名字过滤在回调中做）
                     const options = {
-                        // filters: [{ services: ['00000318-0000-1000-8000-00805f9b34fb'] }], // 可选
-                        acceptAllAdvertisements: true, // 接收所有广播，我们在回调里过滤
-                        keepRepeatedDevices: true      // 持续接收重复广播
+                        filters: filters.length ? filters : [{ namePrefix: 'RL' }], // 后备
+                        optionalServices: ['generic_access']
                     };
+                    appendLog('请求设备选择…', 'info');
 
-                    scanController = await navigator.bluetooth.requestLEScan(options);
-                    scanController.addEventListener('advertisementreceived', handleScanResult);
+                    device = await navigator.bluetooth.requestDevice(options);
+                    appendLog(`已选择设备: ${device.name || '未命名'} (${device.id})`, 'success');
+                    deviceNameEl.textContent = device.name || '未命名';
 
-                    isScanning = true;
-                    scanBtn.textContent = '⏹️ 停止扫描';
-                    statusText.textContent = '扫描中';
-                    statusDetail.textContent = '正在监听广播，等待设备…';
-                    deviceNameEl.textContent = '等待设备…';
-                    updateDisplay(null, null, null, null, '');
+                    statusDetail.textContent = '正在连接 GATT…';
+                    appendLog('尝试建立 GATT 连接…', 'info');
+                    const server = await device.gatt.connect();
+                    appendLog('GATT 连接成功', 'success');
+                    statusText.textContent = 'GATT 已连接';
+
+                    if (!device.watchAdvertisements) {
+                        throw new Error('浏览器不支持 watchAdvertisements，请使用最新 Chrome 并开启实验特性。');
+                    }
+
+                    statusDetail.textContent = '正在监听广播…';
+                    appendLog('开始 watchAdvertisements', 'info');
+                    await device.watchAdvertisements();
+                    device.addEventListener('advertisementreceived', handleAdvertisement);
+
+                    watching = true;
+                    connectBtn.textContent = '🔌 断开连接';
+                    statusDetail.textContent = '已开始监听，等待广播数据…';
+                    appendLog('监听已启动，等待设备广播', 'success');
 
                 } catch (error) {
                     console.error(error);
+                    appendLog(`错误: ${error.message}`, 'error');
                     statusText.textContent = '错误';
                     statusDetail.textContent = '❌ ' + error.message;
-                    if (scanController) {
-                        try { scanController.stop(); } catch (e) {}
-                        scanController = null;
+                    if (device) {
+                        try { device.gatt.disconnect(); } catch (e) {}
+                        device = null;
                     }
-                    isScanning = false;
-                    scanBtn.textContent = '🔍 开始扫描';
+                    watching = false;
+                    connectBtn.textContent = '🔗 连接并监听广播';
                 } finally {
-                    scanBtn.disabled = false;
+          <!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RL_HT_Tag 温湿度采集（规格书版）</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 30px auto;
+            padding: 20px;
+            background: #f4f6f9;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        h1 { font-size: 22px; color: #1a3b5d; text-align: center; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .label { color: #5a6c7d; }
+        .value { font-weight: 600; color: #0b2b44; }
+        .value.temp { color: #d35400; }
+        .value.humid { color: #2980b9; }
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .input-group input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        button:hover { background: #005bb5; }
+        button:disabled { background: #a0b8cc; cursor: not-allowed; }
+        .status { text-align: center; color: #5a6c7d; font-size: 14px; margin-top: 8px; }
+        .log-area {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 6px;
+        }
+        .raw {
+            background: #f0f2f5;
+            padding: 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            margin-top: 4px;
+            word-break: break-all;
+        }
+        .note { font-size: 13px; color: #7f8c8d; text-align: center; margin-top: 10px; }
+        .device-name { color: #007aff; font-weight: 700; }
+        .spec-ref {
+            background: #eaf4ff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 8px 0;
+        }
+        .btn-sm {
+            width: auto;
+            padding: 6px 16px;
+            font-size: 13px;
+            background: #6c757d;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🌡️ RL_HT_Tag 温湿度（规格书解析）</h1>
+
+    <div class="card">
+        <div class="info-row">
+            <span class="label">📱 设备</span>
+            <span class="value device-name" id="deviceName">未选择</span>
+        </div>
+        <div class="info-row">
+            <span class="label">状态</span>
+            <span class="value" id="statusText">未连接</span>
+        </div>
+        <div class="info-row">
+            <span class="label">🌡️ 温度</span>
+            <span class="value temp" id="temperature">-- ℃</span>
+        </div>
+        <div class="info-row">
+            <span class="label">💧 湿度</span>
+            <span class="value humid" id="humidity">-- %</span>
+        </div>
+        <div class="info-row">
+            <span class="label">📶 RSSI</span>
+            <span class="value" id="rssi">-- dBm</span>
+        </div>
+        <div class="info-row" style="flex-direction:column; align-items:stretch;">
+            <span class="label">📋 Service Data (0x0318)</span>
+            <div class="raw" id="rawData">等待数据…</div>
+        </div>
+    </div>
+
+    <div class="input-group">
+        <label for="namePrefix">设备名称前缀：</label>
+        <input type="text" id="namePrefix" value="RL_HT" placeholder="例如: RL_HT" />
+    </div>
+
+    <button id="connectBtn">🔗 连接并监听广播</button>
+    <div class="status" id="statusDetail">点击按钮后，在弹窗中选择设备（按名称前缀过滤）</div>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:600; color:#1a3b5d;">📋 诊断日志</span>
+            <button id="clearLogBtn" class="btn-sm">清空</button>
+        </div>
+        <div class="log-area" id="logArea">[系统] 准备就绪，请点击连接。</div>
+    </div>
+
+    <div class="spec-ref">
+        📖 <strong>解析规则（依据产品规格书）</strong><br>
+        • 温度：字节0（00正/01负），字节1（整数），字节2（小数/100）<br>
+        • 湿度：字节3（整数），字节4（小数/100）<br>
+        • 示例：<code>0x001E4B375D64</code> → 温度 30.75℃, 湿度 55.93%
+    </div>
+
+    <div class="note">
+        * 如果扫描不到设备，请确认设备正在广播（用 nRF Connect 验证），<br>
+        并确保未与其他设备连接。可尝试修改名称前缀或清空后重新扫描。
+    </div>
+
+    <script>
+        (function() {
+            // DOM 元素
+            const connectBtn = document.getElementById('connectBtn');
+            const statusText = document.getElementById('statusText');
+            const statusDetail = document.getElementById('statusDetail');
+            const deviceNameEl = document.getElementById('deviceName');
+            const tempSpan = document.getElementById('temperature');
+            const humSpan = document.getElementById('humidity');
+            const rssiSpan = document.getElementById('rssi');
+            const rawSpan = document.getElementById('rawData');
+            const namePrefixInput = document.getElementById('namePrefix');
+            const logArea = document.getElementById('logArea');
+            const clearLogBtn = document.getElementById('clearLogBtn');
+
+            let device = null;
+            let watching = false;
+
+            // ---------- 日志 ----------
+            function appendLog(msg, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const prefix = type === 'error' ? '❌' : (type === 'success' ? '✅' : 'ℹ️');
+                logArea.textContent += `[${timestamp}] ${prefix} ${msg}\n`;
+                logArea.scrollTop = logArea.scrollHeight;
+            }
+            clearLogBtn.addEventListener('click', () => { logArea.textContent = ''; });
+
+            // ---------- 解析（按规格书） ----------
+            function parseTemperature(hexString) {
+                const clean = hexString.replace(/^0x/, '');
+                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
+                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
+                if (bytes.length < 3) throw new Error('数据长度不足');
+                const sign = bytes[0] === 0x00 ? 1 : -1;
+                const integer = bytes[1];
+                const fraction = bytes[2];
+                return sign * (integer + fraction / 100);
+            }
+
+            function parseHumidity(hexString) {
+                const clean = hexString.replace(/^0x/, '');
+                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
+                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
+                if (bytes.length >= 5) {
+                    const intPart = bytes[3];
+                    const fracPart = bytes[4];
+                    const h = intPart + fracPart / 100;
+                    if (h >= 0 && h <= 100) return h;
+                }
+                return null;
+            }
+
+            function updateDisplay(temp, humidity, rssi, rawHex, name) {
+                if (name) deviceNameEl.textContent = name;
+                tempSpan.textContent = (temp !== null && temp !== undefined) ? temp.toFixed(2) + ' ℃' : '-- ℃';
+                humSpan.textContent = (humidity !== null && humidity !== undefined) ? humidity.toFixed(1) + ' %' : '-- %';
+                rssiSpan.textContent = (rssi !== null && rssi !== undefined) ? rssi + ' dBm' : '-- dBm';
+                rawSpan.textContent = rawHex ? '0x' + rawHex.toUpperCase() : '无数据';
+            }
+
+            // ---------- 处理广播 ----------
+            function handleAdvertisement(event) {
+                const adv = event;
+                appendLog('收到广播数据包', 'info');
+                // 输出完整广播包内容（调试用）
+                try {
+                    const rawBytes = new Uint8Array(adv.rawData.buffer);
+                    let rawHex = '';
+                    for (let i = 0; i < rawBytes.length; i++) {
+                        rawHex += rawBytes[i].toString(16).padStart(2, '0') + ' ';
+                    }
+                    appendLog(`完整广播包: ${rawHex.trim()}`, 'info');
+                } catch (e) {}
+
+                const serviceData = adv.serviceData;
+                if (!serviceData) {
+                    appendLog('广播中未包含 Service Data', 'error');
+                    return;
+                }
+
+                // 查找 UUID 0x0318
+                const targetUUID = '00000318-0000-1000-8000-00805f9b34fb';
+                let dataView = null;
+                for (const [key, value] of serviceData) {
+                    if (key === targetUUID || key.includes('0318')) {
+                        dataView = value;
+                        appendLog(`找到 Service Data UUID: ${key}`, 'success');
+                        break;
+                    }
+                }
+                if (!dataView) {
+                    appendLog('未找到 Service Data 0x0318', 'error');
+                    rawSpan.textContent = '无匹配数据';
+                    return;
+                }
+
+                // 转十六进制
+                const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+                let hex = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    hex += bytes[i].toString(16).padStart(2, '0');
+                }
+                appendLog(`Service Data (0x0318): 0x${hex.toUpperCase()}`, 'info');
+
+                let temp = null, humid = null;
+                try {
+                    temp = parseTemperature(hex);
+                    appendLog(`温度解析: ${temp.toFixed(2)} ℃`, 'success');
+                } catch (e) {
+                    appendLog(`温度解析失败: ${e.message}`, 'error');
+                }
+                try {
+                    humid = parseHumidity(hex);
+                    if (humid !== null) {
+                        appendLog(`湿度解析: ${humid.toFixed(1)} %`, 'success');
+                    } else {
+                        appendLog('湿度解析失败（数据不合理）', 'error');
+                    }
+                } catch (e) {
+                    appendLog(`湿度解析异常: ${e.message}`, 'error');
+                }
+
+                const rssi = adv.rssi;
+                const name = adv.name || device.name || '未知设备';
+                updateDisplay(temp, humid, rssi, hex, name);
+                statusText.textContent = '接收数据中';
+                statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
+            }
+
+            // ---------- 连接/断开 ----------
+            async function connectAndRead() {
+                if (watching) {
+                    // 断开
+                    try {
+                        if (device && device.gatt) {
+                            await device.gatt.disconnect();
+                            appendLog('已断开连接', 'info');
+                        }
+                    } catch (e) {
+                        appendLog(`断开连接出错: ${e.message}`, 'error');
+                    }
+                    watching = false;
+                    device = null;
+                    statusText.textContent = '已断开';
+                    statusDetail.textContent = '点击按钮重新连接';
+                    connectBtn.textContent = '🔗 连接并监听广播';
+                    updateDisplay(null, null, null, null, '未选择');
+                    return;
+                }
+
+                try {
+                    connectBtn.disabled = true;
+                    statusDetail.textContent = '正在扫描设备…';
+                    const prefix = namePrefixInput.value.trim();
+                    appendLog(`开始扫描，名称前缀: "${prefix || '无'}"`, 'info');
+
+                    let filters = [];
+                    if (prefix) {
+                        filters = [{ namePrefix: prefix }];
+                    } else {
+                        // 若无前缀，尝试按服务UUID过滤（但设备可能无标准服务，所以不推荐）
+                        // 这里我们允许用户清空前缀来显示所有设备，但可能看不到仅广播Service Data的设备。
+                        // 所以我们还是使用 acceptAllDevices 并添加 optionalServices 尽量显示。
+                        // 但为了增加可见性，我们仍然尝试 services 过滤，但可能无效。
+                        // 最安全：提示用户使用前缀。
+                        appendLog('未设置名称前缀，可能无法发现仅广播Service Data的设备', 'error');
+                        // 仍然尝试 acceptAllDevices
+                    }
+
+                    const options = {
+                        filters: filters.length ? filters : [{ namePrefix: 'RL' }], // 后备
+                        optionalServices: ['generic_access']
+                    };
+                    appendLog('请求设备选择…', 'info');
+
+                    device = await navigator.bluetooth.requestDevice(options);
+                    appendLog(`已选择设备: ${device.name || '未命名'} (${device.id})`, 'success');
+                    deviceNameEl.textContent = device.name || '未命名';
+
+                    statusDetail.textContent = '正在连接 GATT…';
+                    appendLog('尝试建立 GATT 连接…', 'info');
+                    const server = await device.gatt.connect();
+                    appendLog('GATT 连接成功', 'success');
+                    statusText.textContent = 'GATT 已连接';
+
+                    if (!device.watchAdvertisements) {
+                        throw new Error('浏览器不支持 watchAdvertisements，请使用最新 Chrome 并开启实验特性。');
+                    }
+
+                    statusDetail.textContent = '正在监听广播…';
+                    appendLog('开始 watchAdvertisements', 'info');
+                    await device.watchAdvertisements();
+                    device.addEventListener('advertisementreceived', handleAdvertisement);
+
+                    watching = true;
+                    connectBtn.textContent = '🔌 断开连接';
+                    statusDetail.textContent = '已开始监听，等待广播数据…';
+                    appendLog('监听已启动，等待设备广播', 'success');
+
+                } catch (error) {
+                    console.error(error);
+                    appendLog(`错误: ${error.message}`, 'error');
+                    statusText.textContent = '错误';
+                    statusDetail.textContent = '❌ ' + error.message;
+                    if (device) {
+                        try { device.gatt.disconnect(); } catch (e) {}
+                        device = null;
+                    }
+                    watching = false;
+                    connectBtn.textContent = '🔗 连接并监听广播';
+                } finally {
+                    connectBtn.disabled = false;
                 }
             }
 
-            scanBtn.addEventListener('click', toggleScan);
+            connectBtn.addEventListener('click', connectAndRead);
 
-            // 页面关闭时停止扫描
-            window.addEventListener('beforeunload', () => {
-                if (scanController) {
-                    try { scanController.stop(); } catch (e) {}
+            window.addEventListener('beforeunload', async () => {
+                if (device && watching) {
+                    try { await device.gatt.disconnect(); } catch (e) {}
                 }
             });
 
             // 初始化
-            updateDisplay(null, null, null, null, '未开始');
+            updateDisplay(null, null, null, null, '未选择');
             if (!navigator.bluetooth) {
                 statusText.textContent = '不支持';
                 statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth';
-                scanBtn.disabled = true;
+                connectBtn.disabled = true;
+                appendLog('浏览器不支持 Web Bluetooth', 'error');
+            } else {
+                appendLog('Web Bluetooth 支持，准备就绪', 'info');
+                appendLog('提示：如扫描不到设备，请确认名称前缀正确，并确保设备未被占用。', 'info');
+            }
+        })();
+    </script>
+</body>
+</html>          connectBtn.disabled = false;
+                }
+            }
+
+            connectBtn.addEventListener('click', connectAndRead);
+
+            window.addEventListener('beforeunload', async () => {
+                if (device && watching) {
+                    try { await device.gatt.disconnect(); } catch (e) {}
+                }
+            });
+
+            // 初始化
+            updateDisplay(null, null, null, null, '未选择');
+            if (!navigator.bluetooth) {
+                statusText.textContent = '不支持';
+                statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth';
+                connectBtn.disabled = true;
+                appendLog('浏览器不支持 Web Bluetooth', 'error');
+            } else {
+                appendLog('Web Bluetooth 支持，准备就绪', 'info');
+                appendLog('提示：如扫描不到设备，请确认名称前缀正确，并确保设备未被占用。', 'info');
             }
         })();
     </script>
