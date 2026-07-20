@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>通用 BLE 温湿度读取器</title>
+    <title>BLE 温湿度采集（带名称过滤）</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -14,12 +14,7 @@
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
-        h1 {
-            font-size: 22px;
-            color: #1a3b5d;
-            text-align: center;
-            margin-bottom: 24px;
-        }
+        h1 { font-size: 22px; color: #1a3b5d; text-align: center; }
         .card {
             background: white;
             border-radius: 12px;
@@ -33,19 +28,25 @@
             padding: 8px 0;
             border-bottom: 1px solid #eee;
         }
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        .label {
-            color: #5a6c7d;
-            font-weight: 500;
-        }
-        .value {
-            font-weight: 600;
-            color: #0b2b44;
-        }
+        .info-row:last-child { border-bottom: none; }
+        .label { color: #5a6c7d; font-weight: 500; }
+        .value { font-weight: 600; color: #0b2b44; }
         .value.temp { color: #d35400; }
         .value.humid { color: #2980b9; }
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 12px 0;
+        }
+        .input-group label { font-weight: 500; color: #1a3b5d; }
+        .input-group input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            font-size: 16px;
+        }
         button {
             width: 100%;
             padding: 14px;
@@ -60,16 +61,8 @@
             margin-top: 10px;
         }
         button:hover { background: #005bb5; }
-        button:disabled {
-            background: #a0b8cc;
-            cursor: not-allowed;
-        }
-        .status {
-            text-align: center;
-            color: #5a6c7d;
-            font-size: 14px;
-            margin-top: 12px;
-        }
+        button:disabled { background: #a0b8cc; cursor: not-allowed; }
+        .status { text-align: center; color: #5a6c7d; font-size: 14px; margin-top: 12px; }
         .raw {
             word-break: break-all;
             background: #f0f2f5;
@@ -79,16 +72,8 @@
             font-size: 13px;
             margin-top: 6px;
         }
-        .note {
-            font-size: 13px;
-            color: #7f8c8d;
-            margin-top: 12px;
-            text-align: center;
-        }
-        .device-name {
-            font-weight: 700;
-            color: #007aff;
-        }
+        .note { font-size: 13px; color: #7f8c8d; margin-top: 12px; text-align: center; }
+        .device-name { font-weight: 700; color: #007aff; }
     </style>
 </head>
 <body>
@@ -122,13 +107,17 @@
         </div>
     </div>
 
+    <div class="input-group">
+        <label for="nameFilter">设备名称前缀：</label>
+        <input type="text" id="nameFilter" value="RL_HT" placeholder="例如: RL_HT" />
+    </div>
+
     <button id="connectBtn">🔍 扫描并选择设备</button>
-    <div class="status" id="statusDetail">点击按钮后，在弹窗中选择您的 BLE 设备</div>
-    <div class="note">* 支持 Chrome 80+，需 HTTPS/localhost，可选择任意广播 Service Data 0x0318 的设备。</div>
+    <div class="status" id="statusDetail">点击按钮，在弹窗中选择设备（按名称前缀过滤）</div>
+    <div class="note">* 若扫描不到，请检查名称前缀是否正确，或清空前缀（显示所有可连接设备）。</div>
 
     <script>
         (function() {
-            // DOM 元素
             const connectBtn = document.getElementById('connectBtn');
             const statusText = document.getElementById('statusText');
             const statusDetail = document.getElementById('statusDetail');
@@ -137,12 +126,12 @@
             const humSpan = document.getElementById('humidity');
             const rssiSpan = document.getElementById('rssi');
             const rawSpan = document.getElementById('rawData');
+            const nameFilterInput = document.getElementById('nameFilter');
 
             let device = null;
             let watching = false;
 
-            // ---------- 解析函数 ----------
-            // 温度：字节0符号(00正/01负)，字节1整数，字节2小数(两位)
+            // ---------- 解析函数（与之前相同） ----------
             function parseTemperature(hexString) {
                 const clean = hexString.replace(/^0x/, '');
                 const padded = clean.length % 2 === 0 ? clean : '0' + clean;
@@ -154,7 +143,6 @@
                 return sign * (integer + fraction / 100);
             }
 
-            // 湿度：尝试用字节3整数，字节4小数（占位，可修改）
             function parseHumidity(hexString) {
                 const clean = hexString.replace(/^0x/, '');
                 const padded = clean.length % 2 === 0 ? clean : '0' + clean;
@@ -168,7 +156,6 @@
                 return null;
             }
 
-            // ---------- 更新 UI ----------
             function updateDisplay(temp, humidity, rssi, rawHex, name) {
                 if (name) deviceNameEl.textContent = name;
                 tempSpan.textContent = (temp !== null && temp !== undefined) ? temp.toFixed(2) + ' ℃' : '-- ℃';
@@ -177,7 +164,6 @@
                 rawSpan.textContent = rawHex ? '0x' + rawHex.toUpperCase() : '无数据';
             }
 
-            // ---------- 处理广播事件 ----------
             function handleAdvertisement(event) {
                 const adv = event;
                 const serviceData = adv.serviceData;
@@ -185,8 +171,6 @@
                     statusDetail.textContent = '未包含 Service Data';
                     return;
                 }
-
-                // 查找 UUID 0x0318
                 const targetUUID = '00000318-0000-1000-8000-00805f9b34fb';
                 let dataView = null;
                 for (const [key, value] of serviceData) {
@@ -200,24 +184,14 @@
                     rawSpan.textContent = '无匹配数据';
                     return;
                 }
-
-                // 转十六进制
                 const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
                 let hex = '';
                 for (let i = 0; i < bytes.length; i++) {
                     hex += bytes[i].toString(16).padStart(2, '0');
                 }
-
                 let temp = null, humid = null;
-                try {
-                    temp = parseTemperature(hex);
-                } catch (e) {
-                    statusDetail.textContent = '温度解析失败: ' + e.message;
-                }
-                try {
-                    humid = parseHumidity(hex);
-                } catch (e) {}
-
+                try { temp = parseTemperature(hex); } catch (e) { statusDetail.textContent = '温度解析失败: ' + e.message; }
+                try { humid = parseHumidity(hex); } catch (e) {}
                 const rssi = adv.rssi;
                 const name = adv.name || device.name || '未知设备';
                 updateDisplay(temp, humid, rssi, hex, name);
@@ -225,13 +199,10 @@
                 statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
             }
 
-            // ---------- 连接/断开 ----------
+            // ---------- 连接逻辑 ----------
             async function connectAndRead() {
                 if (watching) {
-                    // 断开
-                    try {
-                        if (device && device.gatt) await device.gatt.disconnect();
-                    } catch (e) {}
+                    try { if (device && device.gatt) await device.gatt.disconnect(); } catch (e) {}
                     watching = false;
                     device = null;
                     statusText.textContent = '已断开';
@@ -245,21 +216,34 @@
                     connectBtn.disabled = true;
                     statusDetail.textContent = '正在扫描设备…';
 
-                    // 使用 acceptAllDevices 让用户自由选择
-                    device = await navigator.bluetooth.requestDevice({
-                        acceptAllDevices: true,
-                        optionalServices: ['generic_access']  // 仅用于满足规范，实际无需连接服务
-                    });
+                    // 获取用户输入的名称前缀，若为空则使用 undefined（显示所有）
+                    const prefix = nameFilterInput.value.trim();
+                    let filters = [];
+                    if (prefix) {
+                        filters = [{ namePrefix: prefix }];
+                    } else {
+                        // 无过滤，但必须保证设备有服务 UUID，否则可能仍不显示。
+                        // 为了更广兼容，这里使用 acceptAllDevices，但可能仍会过滤无服务设备。
+                        // 若用户清空前缀，建议使用 acceptAllDevices，但告知可能看不到某些设备。
+                        // 为了尽可能显示，我们使用 acceptAllDevices: true
+                        // 但此时如果设备没有服务UUID，还是看不到，此时提示用户使用前缀。
+                    }
+
+                    const options = {
+                        // 如果前缀存在，使用 filters；否则用 acceptAllDevices
+                        ...(filters.length ? { filters } : { acceptAllDevices: true }),
+                        optionalServices: ['generic_access']
+                    };
+
+                    device = await navigator.bluetooth.requestDevice(options);
 
                     statusDetail.textContent = '已选择: ' + (device.name || '未命名设备');
                     deviceNameEl.textContent = device.name || '未命名';
 
-                    // 连接 GATT
                     statusDetail.textContent = '正在连接 GATT…';
                     const server = await device.gatt.connect();
                     statusText.textContent = 'GATT 已连接';
 
-                    // 检查 watchAdvertisements
                     if (!device.watchAdvertisements) {
                         throw new Error('浏览器不支持 watchAdvertisements，请使用最新 Chrome 并开启实验特性。');
                     }
@@ -287,7 +271,6 @@
                 }
             }
 
-            // ---------- 事件绑定 ----------
             connectBtn.addEventListener('click', connectAndRead);
 
             window.addEventListener('beforeunload', async () => {
@@ -296,10 +279,8 @@
                 }
             });
 
-            // 初始化
             updateDisplay(null, null, null, null, '未选择');
 
-            // 浏览器兼容性
             if (!navigator.bluetooth) {
                 statusText.textContent = '不支持';
                 statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth，请使用 Chrome 80+';
