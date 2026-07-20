@@ -154,6 +154,59 @@
         .toggle-switch input:checked + .toggle-slider { background: #00897B; }
         .toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
         .toggle-label { font-size: 14px; color: #666; }
+
+        /* 筛选区域 */
+        .filter-area {
+            background: white;
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+        .filter-area label {
+            font-size: 13px;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .filter-area input[type="number"],
+        .filter-area input[type="text"] {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 13px;
+            width: 80px;
+            background: #fafafa;
+            transition: 0.2s;
+        }
+        .filter-area input[type="text"] { width: 120px; }
+        .filter-area input:focus {
+            border-color: #00897B;
+            outline: none;
+            background: white;
+        }
+        .filter-area .filter-btn {
+            background: #00897B;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 6px 18px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .filter-area .filter-btn:active { transform: scale(0.95); }
+        .filter-area .filter-hint {
+            font-size: 12px;
+            color: #999;
+            margin-left: auto;
+        }
+
         .latest-card {
             background: white;
             border-radius: 16px;
@@ -415,6 +468,8 @@
         @media (max-width: 360px) {
             .data-grid { gap: 8px; }
             .data-item .value { font-size: 18px; }
+            .filter-area input[type="number"] { width: 60px; }
+            .filter-area input[type="text"] { width: 90px; }
         }
     </style>
 </head>
@@ -445,6 +500,20 @@
                 <span class="toggle-label">自动记录数据</span>
             </div>
         </div>
+
+        <!-- ===== 新增筛选区域 ===== -->
+        <div class="filter-area">
+            <label>📶 RSSI ≥
+                <input type="number" id="filterRSSI" value="-100" step="1" min="-120" max="0">
+                dBm
+            </label>
+            <label>🔍 MAC包含
+                <input type="text" id="filterMAC" placeholder="例如 AB:CD" style="width:120px;">
+            </label>
+            <button class="filter-btn" onclick="applyFilter()">应用筛选</button>
+            <span class="filter-hint" id="filterCount">已显示 0 台</span>
+        </div>
+
         <div id="latestData" style="display:none">
             <div class="latest-card">
                 <h3>📡 最新采集数据</h3>
@@ -574,9 +643,9 @@ const SERVICE_UUID = "00000318-0000-1000-8000-00805f9b34fb";
 //  全局状态
 // ============================================================
 let isScanning = false;
-let isManualDisconnect = false;           // 🔧 新增：区分主动/被动断开
+let isManualDisconnect = false;
 let bluetoothDevice = null;
-let disconnectHandler = null;             // 🔧 新增：保存监听器引用用于移除
+let disconnectHandler = null;
 let scanTimer = null;
 let reconnectTimer = null;
 let records = JSON.parse(localStorage.getItem('ibeacon_records') || '[]');
@@ -584,6 +653,10 @@ let currentDevices = new Map();
 let chartMetric = 'temp';
 let currentFilter = 'all';
 let resizeTimer = null;
+
+// 筛选条件
+let filterRSSI = -100;          // 默认 -100 dBm，全部通过
+let filterMAC = '';            // 空表示不过滤
 
 const autoRecordCheckbox = document.getElementById('autoRecord');
 autoRecordCheckbox.checked = localStorage.getItem('autoRecord') !== 'false';
@@ -611,7 +684,7 @@ function showToast(msg) {
 }
 
 // ============================================================
-//  核心解析器（修复：温度直接存储为带符号数值字符串）
+//  核心解析器
 // ============================================================
 function parseServiceData(rawHex) {
     if (!rawHex) return null;
@@ -631,7 +704,7 @@ function parseServiceData(rawHex) {
     const humInt = bytes[3];
     const humFrac = bytes[4];
     let battery = bytes[5];
-    if (battery > 100) battery = 100;  // 🔧 电量限制0-100
+    if (battery > 100) battery = 100;
 
     const isNegative = signByte === 0x01;
     const sign = isNegative ? -1 : 1;
@@ -639,17 +712,80 @@ function parseServiceData(rawHex) {
     const humidity = humInt + humFrac / 100;
 
     return {
-        temperature: temperature.toFixed(2),      // 已带符号，如 "-26.69" 或 "26.69"
+        temperature: temperature.toFixed(2),
         humidity: humidity.toFixed(2),
         battery: battery,
-        isNegative: isNegative,                   // 保留供调试
+        isNegative: isNegative,
         rawHex: `0x${hex}`,
         parseDetail: `符号:${isNegative?'负':'正'} | 温:${tempInt.toString(16).padStart(2,'0')}.${tempFrac.toString(16).padStart(2,'0')} | 湿:${humInt.toString(16).padStart(2,'0')}.${humFrac.toString(16).padStart(2,'0')} | 电量:${battery.toString(16).padStart(2,'0')}`
     };
 }
 
 // ============================================================
-//  BLE 扫描与重连（修复：监听器管理 + 主动断开标志）
+//  筛选逻辑
+// ============================================================
+function isDeviceFiltered(record) {
+    // RSSI 检查：如果 record.rssi 为 null，视为不满足（除非阈值极低）
+    if (record.rssi !== null && record.rssi !== undefined) {
+        if (record.rssi < filterRSSI) return false;
+    } else {
+        // 没有 RSSI 信息，默认通过（或者设为不通过，根据需求）
+        // 这里设为通过，以免漏掉一些设备
+    }
+    // MAC 检查
+    if (filterMAC.trim() !== '') {
+        const mac = record.deviceId.toUpperCase();
+        const keyword = filterMAC.trim().toUpperCase();
+        if (!mac.includes(keyword)) return false;
+    }
+    return true;
+}
+
+function applyFilter() {
+    // 读取输入值
+    const rssiInput = document.getElementById('filterRSSI');
+    const macInput = document.getElementById('filterMAC');
+    filterRSSI = parseInt(rssiInput.value, 10);
+    if (isNaN(filterRSSI)) filterRSSI = -100;
+    filterMAC = macInput.value.trim();
+
+    // 重新评估 currentDevices 中所有设备，移除不符合条件的
+    const toRemove = [];
+    for (const [did, item] of currentDevices) {
+        if (!isDeviceFiltered(item.record)) {
+            toRemove.push(did);
+        }
+    }
+    for (const did of toRemove) {
+        currentDevices.delete(did);
+    }
+
+    // 重新渲染
+    renderDeviceList();
+    // 更新最新数据显示（取第一个符合条件的）
+    if (currentDevices.size > 0) {
+        const first = currentDevices.values().next().value;
+        updateLatestData(first.record);
+    } else {
+        document.getElementById('latestData').style.display = 'none';
+    }
+    // 更新计数器
+    document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
+    showToast(`筛选已应用，当前显示 ${currentDevices.size} 台设备`);
+}
+
+// 监听输入框回车事件
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('filterRSSI').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') applyFilter();
+    });
+    document.getElementById('filterMAC').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') applyFilter();
+    });
+});
+
+// ============================================================
+//  BLE 扫描与重连
 // ============================================================
 async function toggleScan() {
     if (isScanning) await stopScan();
@@ -674,19 +810,14 @@ async function startScan() {
             optionalServices: [SERVICE_UUID]
         });
         bluetoothDevice = device;
-        isManualDisconnect = false;   // 🔧 重置标志
+        isManualDisconnect = false;
 
-        // 🔧 移除旧监听器，防止重复添加
         if (disconnectHandler) {
             device.removeEventListener('gattserverdisconnected', disconnectHandler);
             disconnectHandler = null;
         }
-        // 🔧 创建新监听器并保存引用
         disconnectHandler = async () => {
-            if (isManualDisconnect) {
-                // 主动断开，不触发重连
-                return;
-            }
+            if (isManualDisconnect) return;
             showToast('设备断开，等待自动重连...');
             isScanning = false;
             updateScanUI();
@@ -731,7 +862,6 @@ async function readGattNotify(server) {
                 if (ch.properties.notify) {
                     await ch.startNotifications();
                     ch.addEventListener('characteristicvaluechanged', ev => {
-                        // 🔧 修复 DataView 偏移量
                         const buf = ev.target.value;
                         const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
                         const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -750,7 +880,6 @@ function handleAdvertisement(event) {
     const rssi = event.rssi;
     if (!event.manufacturerData) return;
     event.manufacturerData.forEach((buf, companyId) => {
-        // 🔧 修复 DataView 偏移量
         const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
         const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
         handleData(hex, dev.name || 'RL_HT_Tag', dev.id, rssi);
@@ -767,13 +896,23 @@ function handleData(rawHex, devName, devId, rssi = null) {
         deviceName: devName,
         deviceId: devId,
         rawData: parsed.rawHex,
-        temperature: parsed.temperature,   // 已带符号
+        temperature: parsed.temperature,
         humidity: parsed.humidity,
         battery: parsed.battery,
         isNegative: parsed.isNegative,
         rssi: rssi,
         parseDetail: parsed.parseDetail
     };
+
+    // ==== 应用筛选：不符合条件的设备忽略 ====
+    if (!isDeviceFiltered(record)) {
+        // 如果已存在该设备，但新数据不符合条件，不更新（维持原有）
+        // 但为了保持一致性，如果设备已存在且不符合新条件，应移除
+        // 这里我们只在新数据加入时判断，对于已存在的设备，在 applyFilter 中统一处理
+        // 所以此处直接返回，不加入也不记录
+        return;
+    }
+
     currentDevices.set(devId, { record, lastUpdateTs: now });
     renderDeviceList();
     updateLatestData(record);
@@ -783,6 +922,8 @@ function handleData(rawHex, devName, devId, rssi = null) {
         localStorage.setItem('ibeacon_records', JSON.stringify(records));
         updateBadge();
     }
+    // 更新计数
+    document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
 }
 
 function startDeviceCleanTimer() {
@@ -796,12 +937,15 @@ function startDeviceCleanTimer() {
                 needRender = true;
             }
         }
-        if (needRender) renderDeviceList();
+        if (needRender) {
+            renderDeviceList();
+            document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
+        }
     }, CLEAN_DEV_INTERVAL);
 }
 
 async function stopScan() {
-    isManualDisconnect = true;   // 🔧 标记为主动断开
+    isManualDisconnect = true;
     isScanning = false;
     clearInterval(scanTimer);
     clearTimeout(reconnectTimer);
@@ -810,14 +954,12 @@ async function stopScan() {
     if (bluetoothDevice && bluetoothDevice.gatt.connected) {
         bluetoothDevice.gatt.disconnect();
     }
-    // 🔧 移除监听器
     if (bluetoothDevice && disconnectHandler) {
         bluetoothDevice.removeEventListener('gattserverdisconnected', disconnectHandler);
         disconnectHandler = null;
     }
     updateScanUI();
     showToast('已停止蓝牙扫描采集');
-    // 延迟重置标志，防止断开事件干扰
     setTimeout(() => { isManualDisconnect = false; }, 500);
 }
 
@@ -841,11 +983,10 @@ function updateScanUI() {
 }
 
 // ============================================================
-//  UI 渲染（修复：直接使用已带符号的 temperature）
+//  UI 渲染
 // ============================================================
 function updateLatestData(record) {
     document.getElementById('latestData').style.display = 'block';
-    // 🔧 直接使用 record.temperature（已带符号）
     document.getElementById('latestTemp').textContent = record.temperature;
     document.getElementById('latestHum').textContent = record.humidity;
     document.getElementById('latestBat').textContent = record.battery;
@@ -964,7 +1105,7 @@ function updateBadge() {
 }
 
 // ============================================================
-//  图表（修复：温度数据不再重复乘以符号）
+//  图表
 // ============================================================
 function setChartMetric(metric, el) {
     chartMetric = metric;
@@ -995,7 +1136,7 @@ function renderChart() {
 
     const data = records.slice(0, 50).reverse();
     const values = data.map(r => {
-        if (chartMetric === 'temp') return parseFloat(r.temperature);   // 🔧 直接解析，不再乘符号
+        if (chartMetric === 'temp') return parseFloat(r.temperature);
         if (chartMetric === 'hum') return parseFloat(r.humidity);
         return r.battery;
     });
@@ -1011,7 +1152,6 @@ function renderChart() {
     const colorMap = { temp: '#E57373', hum: '#42A5F5', bat: '#66BB6A' };
     const lineColor = colorMap[chartMetric];
 
-    // 网格
     ctx.strokeStyle = '#f0f0f0';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
@@ -1034,13 +1174,11 @@ function renderChart() {
             i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         });
         ctx.stroke();
-        // 面积填充 (透明度调整)
-        ctx.fillStyle = lineColor + '40';   // 🔧 提高透明度 20→40
+        ctx.fillStyle = lineColor + '40';
         ctx.lineTo(40 + (values.length - 1) * stepX, h - 30);
         ctx.lineTo(40, h - 30);
         ctx.closePath();
         ctx.fill();
-        // 数据点
         ctx.fillStyle = lineColor;
         values.forEach((v, i) => {
             const x = 40 + i * stepX;
@@ -1048,14 +1186,12 @@ function renderChart() {
             ctx.beginPath();
             ctx.arc(x, y, 4, 0, Math.PI * 2);
             ctx.fill();
-            // 加白色边框更清晰
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 1.5;
             ctx.stroke();
         });
     }
 
-    // Y轴刻度
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
@@ -1119,6 +1255,7 @@ function clearAllData() {
     renderChart();
     document.getElementById('latestData').style.display = 'none';
     document.getElementById('deviceList').innerHTML = '';
+    document.getElementById('filterCount').textContent = '已显示 0 台';
     showToast('所有记录与在线设备已清空');
 }
 
@@ -1144,6 +1281,9 @@ function escapeHtml(text) {
 //  初始化 & 响应式
 // ============================================================
 updateBadge();
+// 初始化计数
+document.getElementById('filterCount').textContent = '已显示 0 台';
+
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
