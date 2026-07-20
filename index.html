@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#00897B">
-    <title>iBeacon RL_HT_Tag 2.0 温湿度扫描记录器</title>
+    <title>iBeacon RL_HT_Tag 温湿度扫描记录器</title>
     <style>
         * {
             margin: 0;
@@ -501,7 +501,7 @@
             </div>
         </div>
 
-        <!-- ===== 新增筛选区域 ===== -->
+        <!-- 筛选区域 -->
         <div class="filter-area">
             <label>📶 RSSI ≥
                 <input type="number" id="filterRSSI" value="-100" step="1" min="-120" max="0">
@@ -655,8 +655,8 @@ let currentFilter = 'all';
 let resizeTimer = null;
 
 // 筛选条件
-let filterRSSI = -100;          // 默认 -100 dBm，全部通过
-let filterMAC = '';            // 空表示不过滤
+let filterRSSI = -100;
+let filterMAC = '';
 
 const autoRecordCheckbox = document.getElementById('autoRecord');
 autoRecordCheckbox.checked = localStorage.getItem('autoRecord') !== 'false';
@@ -722,17 +722,12 @@ function parseServiceData(rawHex) {
 }
 
 // ============================================================
-//  筛选逻辑
+//  筛选逻辑（增强：动态移除不符合的旧设备）
 // ============================================================
 function isDeviceFiltered(record) {
-    // RSSI 检查：如果 record.rssi 为 null，视为不满足（除非阈值极低）
     if (record.rssi !== null && record.rssi !== undefined) {
         if (record.rssi < filterRSSI) return false;
-    } else {
-        // 没有 RSSI 信息，默认通过（或者设为不通过，根据需求）
-        // 这里设为通过，以免漏掉一些设备
     }
-    // MAC 检查
     if (filterMAC.trim() !== '') {
         const mac = record.deviceId.toUpperCase();
         const keyword = filterMAC.trim().toUpperCase();
@@ -742,14 +737,13 @@ function isDeviceFiltered(record) {
 }
 
 function applyFilter() {
-    // 读取输入值
     const rssiInput = document.getElementById('filterRSSI');
     const macInput = document.getElementById('filterMAC');
     filterRSSI = parseInt(rssiInput.value, 10);
     if (isNaN(filterRSSI)) filterRSSI = -100;
     filterMAC = macInput.value.trim();
 
-    // 重新评估 currentDevices 中所有设备，移除不符合条件的
+    // 移除不符合条件的设备
     const toRemove = [];
     for (const [did, item] of currentDevices) {
         if (!isDeviceFiltered(item.record)) {
@@ -760,28 +754,23 @@ function applyFilter() {
         currentDevices.delete(did);
     }
 
-    // 重新渲染
     renderDeviceList();
-    // 更新最新数据显示（取第一个符合条件的）
-    if (currentDevices.size > 0) {
-        const first = currentDevices.values().next().value;
-        updateLatestData(first.record);
-    } else {
-        document.getElementById('latestData').style.display = 'none';
-    }
-    // 更新计数器
+    updateLatestDataIfEmpty();
     document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
     showToast(`筛选已应用，当前显示 ${currentDevices.size} 台设备`);
 }
 
-// 监听输入框回车事件
+// 当设备列表为空时，隐藏最新数据区域
+function updateLatestDataIfEmpty() {
+    if (currentDevices.size === 0) {
+        document.getElementById('latestData').style.display = 'none';
+    }
+}
+
+// 监听输入框回车
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('filterRSSI').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') applyFilter();
-    });
-    document.getElementById('filterMAC').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') applyFilter();
-    });
+    document.getElementById('filterRSSI').addEventListener('keypress', e => { if (e.key === 'Enter') applyFilter(); });
+    document.getElementById('filterMAC').addEventListener('keypress', e => { if (e.key === 'Enter') applyFilter(); });
 });
 
 // ============================================================
@@ -886,6 +875,7 @@ function handleAdvertisement(event) {
     });
 }
 
+// ===== 核心数据处理器（增强：自动移除不符合筛选的旧设备） =====
 function handleData(rawHex, devName, devId, rssi = null) {
     const parsed = parseServiceData(rawHex);
     if (!parsed) return;
@@ -904,15 +894,21 @@ function handleData(rawHex, devName, devId, rssi = null) {
         parseDetail: parsed.parseDetail
     };
 
-    // ==== 应用筛选：不符合条件的设备忽略 ====
-    if (!isDeviceFiltered(record)) {
-        // 如果已存在该设备，但新数据不符合条件，不更新（维持原有）
-        // 但为了保持一致性，如果设备已存在且不符合新条件，应移除
-        // 这里我们只在新数据加入时判断，对于已存在的设备，在 applyFilter 中统一处理
-        // 所以此处直接返回，不加入也不记录
+    const passed = isDeviceFiltered(record);
+    const exists = currentDevices.has(devId);
+
+    if (!passed) {
+        // 如果设备已存在但不再满足条件，则移除
+        if (exists) {
+            currentDevices.delete(devId);
+            renderDeviceList();
+            updateLatestDataIfEmpty();
+            document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
+        }
         return;
     }
 
+    // 满足条件，更新或添加
     currentDevices.set(devId, { record, lastUpdateTs: now });
     renderDeviceList();
     updateLatestData(record);
@@ -922,7 +918,6 @@ function handleData(rawHex, devName, devId, rssi = null) {
         localStorage.setItem('ibeacon_records', JSON.stringify(records));
         updateBadge();
     }
-    // 更新计数
     document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
 }
 
@@ -939,6 +934,7 @@ function startDeviceCleanTimer() {
         }
         if (needRender) {
             renderDeviceList();
+            updateLatestDataIfEmpty();
             document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
         }
     }, CLEAN_DEV_INTERVAL);
@@ -1281,7 +1277,6 @@ function escapeHtml(text) {
 //  初始化 & 响应式
 // ============================================================
 updateBadge();
-// 初始化计数
 document.getElementById('filterCount').textContent = '已显示 0 台';
 
 window.addEventListener('resize', () => {
