@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BLE 温湿度扫描器（可配置 UUID）</title>
+    <title>BLE 温湿度扫描器（自动匹配）</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -119,8 +119,8 @@
 </head>
 <body>
 
-    <h1>📡 BLE 温湿度扫描器</h1>
-    <div class="sub">可配置 Service Data UUID 匹配</div>
+    <h1>📡 BLE 温湿度扫描器（自动匹配）</h1>
+    <div class="sub">自动尝试所有 Service Data / 厂商数据</div>
 
     <div class="warning">
         ⚠️ 需启用 Chrome 实验性功能：<br>
@@ -149,14 +149,14 @@
             <span class="value" id="rssi">-- dBm</span>
         </div>
         <div class="info-row" style="flex-direction:column; align-items:stretch;">
-            <span class="label">📋 原始数据 (Service Data)</span>
-            <div class="raw" id="rawData">等待数据…</div>
+            <span class="label">📋 使用的数据源</span>
+            <div class="raw" id="dataSource">等待数据…</div>
         </div>
     </div>
 
     <div class="input-group">
-        <label for="uuidFilter">匹配 UUID 包含：</label>
-        <input type="text" id="uuidFilter" value="0318" placeholder="例如 0318 或 00001804" />
+        <label for="uuidFilter">可选指定 UUID 包含：</label>
+        <input type="text" id="uuidFilter" value="" placeholder="留空则自动匹配所有数据块" />
     </div>
 
     <button id="scanBtn">🔍 开始扫描</button>
@@ -174,12 +174,12 @@
         📖 <strong>解析规则</strong><br>
         • 温度：字节0（00正/01负），字节1（整数），字节2（小数/100）<br>
         • 湿度：字节3（整数），字节4（小数/100）<br>
-        • 示例：<code>0x001A4E361A64</code> → 温度 26.78℃, 湿度 54.26%
+        • 自动尝试所有 Service Data 和厂商数据，找到第一个符合格式的数据块即显示。
     </div>
 
     <div class="note">
-        * 匹配 Service Data UUID 中包含您输入字符串的数据块（不区分大小写）。<br>
-        * 若无法解析，请查看日志中打印的所有 Service Data UUID，调整匹配字符串。
+        * 如果未指定 UUID，将尝试解析所有数据块。<br>
+        * 若自动匹配失败，请查看日志中打印的所有 UUID，手动填写匹配字符串。
     </div>
 
     <script>
@@ -191,7 +191,7 @@
             const tempSpan = document.getElementById('temperature');
             const humSpan = document.getElementById('humidity');
             const rssiSpan = document.getElementById('rssi');
-            const rawSpan = document.getElementById('rawData');
+            const dataSourceEl = document.getElementById('dataSource');
             const uuidFilterInput = document.getElementById('uuidFilter');
             const logArea = document.getElementById('logArea');
             const clearLogBtn = document.getElementById('clearLogBtn');
@@ -232,12 +232,28 @@
                 return null;
             }
 
-            function updateDisplay(temp, humidity, rssi, rawHex, name) {
+            function updateDisplay(temp, humidity, rssi, sourceDesc, name) {
                 if (name) deviceNameEl.textContent = name;
                 tempSpan.textContent = (temp !== null && temp !== undefined) ? temp.toFixed(2) + ' ℃' : '-- ℃';
                 humSpan.textContent = (humidity !== null && humidity !== undefined) ? humidity.toFixed(1) + ' %' : '-- %';
                 rssiSpan.textContent = (rssi !== null && rssi !== undefined) ? rssi + ' dBm' : '-- dBm';
-                rawSpan.textContent = rawHex ? '0x' + rawHex.toUpperCase() : '无数据';
+                dataSourceEl.textContent = sourceDesc || '无数据';
+            }
+
+            // ---------- 尝试解析数据块 ----------
+            function tryParseData(hexData, sourceLabel) {
+                if (!hexData || hexData.length < 6) return null;
+                let temp = null, humid = null;
+                try {
+                    temp = parseTemperature(hexData);
+                } catch (e) {}
+                try {
+                    humid = parseHumidity(hexData);
+                } catch (e) {}
+                if (temp !== null || humid !== null) {
+                    return { temp, humid, source: sourceLabel };
+                }
+                return null;
             }
 
             // ---------- 处理扫描结果 ----------
@@ -259,91 +275,66 @@
                 deviceNameEl.textContent = deviceName;
 
                 const serviceData = result.serviceData;
-                if (!serviceData) {
-                    appendLog('无 Service Data', 'error');
-                    return;
-                }
-
-                // 打印所有 Service Data UUID
-                const uuids = Array.from(serviceData.keys());
-                appendLog(`Service Data UUIDs: ${uuids.join(', ')}`, 'info');
-
-                // 获取用户输入的匹配字符串
+                const manufacturerData = result.manufacturerData;
                 const filterStr = uuidFilterInput.value.trim();
-                if (!filterStr) {
-                    appendLog('未配置匹配字符串，请填写 UUID 包含的字符串', 'error');
-                    return;
-                }
+                let found = false;
 
-                // 查找包含 filterStr 的 UUID（不区分大小写）
-                let dataView = null;
-                let matchedUUID = null;
-                const lowerFilter = filterStr.toLowerCase();
-                for (const [key, value] of serviceData) {
-                    if (key.toLowerCase().includes(lowerFilter)) {
-                        dataView = value;
-                        matchedUUID = key;
-                        break;
-                    }
-                }
+                // 1. 检查 Service Data
+                if (serviceData) {
+                    const uuids = Array.from(serviceData.keys());
+                    appendLog(`Service Data UUIDs: ${uuids.join(', ')}`, 'info');
 
-                if (!dataView) {
-                    appendLog(`未找到包含 "${filterStr}" 的 Service Data`, 'error');
-                    // 尝试从厂商数据解析（兜底）
-                    const manufacturerData = result.manufacturerData;
-                    if (manufacturerData) {
-                        appendLog('尝试从厂商数据解析...', 'info');
-                        for (const [companyId, data] of manufacturerData) {
-                            const bytes = new Uint8Array(data.buffer);
-                            let hex = '';
-                            for (let i = 0; i < bytes.length; i++) {
-                                hex += bytes[i].toString(16).padStart(2, '0');
-                            }
-                            appendLog(`  厂商数据 0x${companyId.toString(16).padStart(4, '0')}: 0x${hex.toUpperCase()}`, 'info');
-                            const temp = parseTemperature(hex);
-                            const hum = parseHumidity(hex);
-                            if (temp !== null || hum !== null) {
-                                appendLog(`✅ 从厂商数据解析成功`, 'success');
-                                updateDisplay(temp, hum, result.rssi, hex, deviceName);
-                                statusText.textContent = '扫描中';
-                                statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
-                                return;
-                            }
+                    for (const [uuid, dataView] of serviceData) {
+                        // 如果指定了过滤字符串，则跳过不匹配的
+                        if (filterStr && !uuid.toLowerCase().includes(filterStr.toLowerCase())) {
+                            continue;
+                        }
+                        const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+                        let hex = '';
+                        for (let i = 0; i < bytes.length; i++) {
+                            hex += bytes[i].toString(16).padStart(2, '0');
+                        }
+                        appendLog(`  尝试 UUID ${uuid}: 0x${hex.toUpperCase()}`, 'info');
+                        const result = tryParseData(hex, `Service Data (${uuid})`);
+                        if (result) {
+                            appendLog(`✅ 从 ${result.source} 解析成功`, 'success');
+                            updateDisplay(result.temp, result.humid, result.rssi || result.rssi, result.source, deviceName);
+                            statusText.textContent = '扫描中';
+                            statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
+                            found = true;
+                            break; // 找到第一个成功的就停止
                         }
                     }
-                    return;
                 }
 
-                appendLog(`匹配到 Service Data UUID: ${matchedUUID}`, 'success');
-
-                // 提取数据
-                const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
-                let hex = '';
-                for (let i = 0; i < bytes.length; i++) {
-                    hex += bytes[i].toString(16).padStart(2, '0');
-                }
-                appendLog(`Service Data 内容: 0x${hex.toUpperCase()}`, 'info');
-
-                let temp = null, humid = null;
-                try {
-                    temp = parseTemperature(hex);
-                    if (temp !== null) appendLog(`温度解析: ${temp.toFixed(2)} ℃`, 'success');
-                    else appendLog('温度解析失败（数据格式不符）', 'error');
-                } catch (e) {
-                    appendLog(`温度解析异常: ${e.message}`, 'error');
-                }
-                try {
-                    humid = parseHumidity(hex);
-                    if (humid !== null) appendLog(`湿度解析: ${humid.toFixed(1)} %`, 'success');
-                    else appendLog('湿度解析失败（数据格式不符）', 'error');
-                } catch (e) {
-                    appendLog(`湿度解析异常: ${e.message}`, 'error');
+                // 2. 如果 Service Data 没找到，尝试厂商数据
+                if (!found && manufacturerData) {
+                    appendLog('尝试从厂商数据解析...', 'info');
+                    for (const [companyId, dataView] of manufacturerData) {
+                        const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+                        let hex = '';
+                        for (let i = 0; i < bytes.length; i++) {
+                            hex += bytes[i].toString(16).padStart(2, '0');
+                        }
+                        appendLog(`  厂商数据 0x${companyId.toString(16).padStart(4, '0')}: 0x${hex.toUpperCase()}`, 'info');
+                        const result = tryParseData(hex, `厂商数据 (0x${companyId.toString(16).padStart(4, '0')})`);
+                        if (result) {
+                            appendLog(`✅ 从 ${result.source} 解析成功`, 'success');
+                            updateDisplay(result.temp, result.humid, result.rssi || result.rssi, result.source, deviceName);
+                            statusText.textContent = '扫描中';
+                            statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
+                            found = true;
+                            break;
+                        }
+                    }
                 }
 
-                const rssi = result.rssi;
-                updateDisplay(temp, humid, rssi, hex, deviceName);
-                statusText.textContent = '扫描中';
-                statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
+                if (!found) {
+                    appendLog('⚠️ 未在任何数据块中找到有效的温湿度数据', 'error');
+                    updateDisplay(null, null, result.rssi, '未解析到数据', deviceName);
+                    statusText.textContent = '扫描中（无有效数据）';
+                    statusDetail.textContent = '尝试其他数据块...';
+                }
             }
 
             // ---------- 扫描控制 ----------
@@ -384,7 +375,7 @@
                     statusText.textContent = '扫描中';
                     statusDetail.textContent = '正在监听广播…';
                     deviceNameEl.textContent = '等待设备…';
-                    updateDisplay(null, null, null, null, '');
+                    updateDisplay(null, null, null, '等待数据...', '');
                     appendLog('扫描已启动，等待广播数据', 'success');
 
                 } catch (error) {
@@ -413,7 +404,7 @@
             });
 
             // 初始化
-            updateDisplay(null, null, null, null, '');
+            updateDisplay(null, null, null, '未开始', '');
             if (!navigator.bluetooth) {
                 statusText.textContent = '不支持';
                 statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth';
@@ -421,7 +412,7 @@
                 appendLog('浏览器不支持 Web Bluetooth', 'error');
             } else {
                 appendLog('Web Bluetooth 可用，请点击“开始扫描”', 'info');
-                appendLog('提示：请填写要匹配的 UUID 包含字符串（如 0318）', 'info');
+                appendLog('提示：留空 UUID 将自动尝试所有数据块', 'info');
             }
         })();
     </script>
