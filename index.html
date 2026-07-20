@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RL_HT_Tag 温湿度采集（精确匹配 0x0318）</title>
+    <title>RL_HT_Tag 温湿度（匹配 00001804）</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -15,7 +15,7 @@
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
-        h1 { font-size: 22px; color: #1a3b5d; text-align: center; margin-bottom: 8px; }
+        h1 { font-size: 22px; color: #1a3b5d; text-align: center; }
         .sub { text-align: center; color: #6c7a89; font-size: 14px; margin-top: -6px; margin-bottom: 20px; }
         .card {
             background: white;
@@ -115,7 +115,7 @@
 <body>
 
     <h1>🌡️ RL_HT_Tag 温湿度</h1>
-    <div class="sub">精确匹配 Service Data UUID 0x0318</div>
+    <div class="sub">匹配 Service Data UUID: 00001804 或 0318</div>
 
     <div class="warning">
         ⚠️ 需启用 Chrome 实验性功能：<br>
@@ -144,7 +144,7 @@
             <span class="value" id="rssi">-- dBm</span>
         </div>
         <div class="info-row" style="flex-direction:column; align-items:stretch;">
-            <span class="label">📋 Service Data (0x0318)</span>
+            <span class="label">📋 原始数据 (Service Data)</span>
             <div class="raw" id="rawData">等待数据…</div>
         </div>
     </div>
@@ -166,15 +166,15 @@
     </div>
 
     <div class="spec-ref">
-        📖 <strong>解析规则（依据产品规格书）</strong><br>
+        📖 <strong>解析规则</strong><br>
         • 温度：字节0（00正/01负），字节1（整数），字节2（小数/100）<br>
         • 湿度：字节3（整数），字节4（小数/100）<br>
         • 示例：<code>0x001A4E361A64</code> → 温度 26.78℃, 湿度 54.26%
     </div>
 
     <div class="note">
-        * 若仍无法解析，请查看日志中打印的所有 Service Data UUID，确认设备实际广播的 UUID。<br>
-        * 可尝试清空名称过滤，或使用 Python 脚本（下方提供）进行 100% 可靠抓取。
+        * 匹配 UUID 包含 "1804" 或 "0318" 的 Service Data。<br>
+        * 若仍无法解析，请查看日志中打印的所有 Service Data UUID，并运行 Python 脚本（下方提供）。
     </div>
 
     <script>
@@ -269,14 +269,12 @@
                 const uuids = Array.from(serviceData.keys());
                 appendLog(`Service Data UUIDs: ${uuids.join(', ')}`, 'info');
 
-                // 精确匹配 UUID 0x0318（支持长格式和短格式）
+                // 匹配 UUID 包含 "1804" 或 "0318"
                 let dataView = null;
                 let matchedUUID = null;
-                const targetLong = '00000318-0000-1000-8000-00805f9b34fb';
-                const targetShort = '0318';
                 for (const [key, value] of serviceData) {
                     const lowerKey = key.toLowerCase();
-                    if (lowerKey === targetLong.toLowerCase() || lowerKey.includes(targetShort)) {
+                    if (lowerKey.includes('1804') || lowerKey.includes('0318')) {
                         dataView = value;
                         matchedUUID = key;
                         break;
@@ -284,7 +282,7 @@
                 }
 
                 if (!dataView) {
-                    appendLog('未找到 UUID 包含 "0318" 的 Service Data', 'error');
+                    appendLog('未找到包含 "1804" 或 "0318" 的 Service Data', 'error');
                     // 尝试从厂商数据解析（兜底）
                     const manufacturerData = result.manufacturerData;
                     if (manufacturerData) {
@@ -417,7 +415,7 @@
                 appendLog('浏览器不支持 Web Bluetooth', 'error');
             } else {
                 appendLog('Web Bluetooth 可用，请点击“开始扫描”', 'info');
-                appendLog('提示：本工具精确匹配 Service Data UUID 0x0318', 'info');
+                appendLog('提示：匹配 Service Data UUID 包含 "1804" 或 "0318"', 'info');
             }
         })();
     </script>
