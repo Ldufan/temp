@@ -19,7 +19,6 @@
             min-height: 100vh;
             padding-bottom: 80px;
         }
-        /* Header */
         .header {
             background: linear-gradient(135deg, #00897B, #00695C);
             color: white;
@@ -29,16 +28,8 @@
             z-index: 100;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
-        .header h1 {
-            font-size: 20px;
-            font-weight: 600;
-        }
-        .header .subtitle {
-            font-size: 12px;
-            opacity: 0.85;
-            margin-top: 4px;
-        }
-        /* Tab Navigation */
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .subtitle { font-size: 12px; opacity: 0.85; margin-top: 4px; }
         .tab-bar {
             display: flex;
             background: white;
@@ -59,9 +50,7 @@
             transition: all 0.3s;
             font-weight: 500;
         }
-        .tab-btn.active {
-            color: #00897B;
-        }
+        .tab-btn.active { color: #00897B; }
         .tab-btn.active::after {
             content: '';
             position: absolute;
@@ -82,20 +71,12 @@
             margin-left: 4px;
             vertical-align: middle;
         }
-        /* Tab Content */
-        .tab-content {
-            display: none;
-            padding: 16px;
-            animation: fadeIn 0.3s ease;
-        }
-        .tab-content.active {
-            display: block;
-        }
+        .tab-content { display: none; padding: 16px; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        /* Scan Control */
         .scan-control {
             background: white;
             border-radius: 16px;
@@ -125,27 +106,15 @@
             background: linear-gradient(135deg, #E57373, #D32F2F);
             box-shadow: 0 4px 15px rgba(229,115,115,0.4);
         }
-        .scan-btn:active {
-            transform: scale(0.95);
-        }
-        .scan-btn.scanning {
-            animation: pulse 1.5s infinite;
-        }
+        .scan-btn:active { transform: scale(0.95); }
+        .scan-btn.scanning { animation: pulse 1.5s infinite; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0,137,123,0.4); }
             70% { box-shadow: 0 0 0 20px rgba(0,137,123,0); }
             100% { box-shadow: 0 0 0 0 rgba(0,137,123,0); }
         }
-        .scan-status {
-            margin-top: 12px;
-            font-size: 14px;
-            color: #666;
-        }
-        .scan-status.scanning {
-            color: #00897B;
-            font-weight: 500;
-        }
-        /* Auto Record Toggle */
+        .scan-status { margin-top: 12px; font-size: 14px; color: #666; }
+        .scan-status.scanning { color: #00897B; font-weight: 500; }
         .toggle-row {
             display: flex;
             align-items: center;
@@ -158,11 +127,7 @@
             width: 48px;
             height: 26px;
         }
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
         .toggle-slider {
             position: absolute;
             cursor: pointer;
@@ -186,17 +151,9 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
             transition: 0.3s;
         }
-        .toggle-switch input:checked + .toggle-slider {
-            background: #00897B;
-        }
-        .toggle-switch input:checked + .toggle-slider::before {
-            transform: translateX(22px);
-        }
-        .toggle-label {
-            font-size: 14px;
-            color: #666;
-        }
-        /* Latest Data Card */
+        .toggle-switch input:checked + .toggle-slider { background: #00897B; }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
+        .toggle-label { font-size: 14px; color: #666; }
         .latest-card {
             background: white;
             border-radius: 16px;
@@ -205,11 +162,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             border-left: 4px solid #00897B;
         }
-        .latest-card h3 {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 12px;
-        }
+        .latest-card h3 { font-size: 14px; color: #666; margin-bottom: 12px; }
         .data-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -221,19 +174,9 @@
             background: #f8f9fa;
             border-radius: 12px;
         }
-        .data-item .label {
-            font-size: 11px;
-            color: #888;
-            margin-bottom: 4px;
-        }
-        .data-item .value {
-            font-size: 22px;
-            font-weight: 700;
-        }
-        .data-item .unit {
-            font-size: 12px;
-            color: #888;
-        }
+        .data-item .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .data-item .value { font-size: 22px; font-weight: 700; }
+        .data-item .unit { font-size: 12px; color: #888; }
         .temp-value { color: #E57373; }
         .hum-value { color: #42A5F5; }
         .bat-value { color: #66BB6A; }
@@ -257,7 +200,6 @@
             line-height: 1.6;
             color: #777;
         }
-        /* Device Card */
         .device-card {
             background: white;
             border-radius: 12px;
@@ -266,20 +208,14 @@
             box-shadow: 0 1px 4px rgba(0,0,0,0.06);
             transition: transform 0.2s;
         }
-        .device-card:active {
-            transform: scale(0.98);
-        }
+        .device-card:active { transform: scale(0.98); }
         .device-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
         }
-        .device-name {
-            font-size: 15px;
-            font-weight: 600;
-            color: #333;
-        }
+        .device-name { font-size: 15px; font-weight: 600; color: #333; }
         .device-rssi {
             font-size: 12px;
             color: #888;
@@ -287,12 +223,7 @@
             padding: 2px 8px;
             border-radius: 10px;
         }
-        .device-mac {
-            font-size: 12px;
-            color: #999;
-            margin-bottom: 10px;
-            font-family: monospace;
-        }
+        .device-mac { font-size: 12px; color: #999; margin-bottom: 10px; font-family: monospace; }
         .device-values {
             display: flex;
             justify-content: space-around;
@@ -300,24 +231,10 @@
             border-top: 1px solid #f0f0f0;
             border-bottom: 1px solid #f0f0f0;
         }
-        .device-value {
-            text-align: center;
-        }
-        .device-value .v-label {
-            font-size: 11px;
-            color: #888;
-        }
-        .device-value .v-num {
-            font-size: 16px;
-            font-weight: 700;
-        }
-        .device-raw {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #aaa;
-            font-family: monospace;
-        }
-        /* History Item */
+        .device-value { text-align: center; }
+        .device-value .v-label { font-size: 11px; color: #888; }
+        .device-value .v-num { font-size: 16px; font-weight: 700; }
+        .device-raw { margin-top: 8px; font-size: 11px; color: #aaa; font-family: monospace; }
         .history-item {
             background: white;
             border-radius: 12px;
@@ -330,15 +247,8 @@
             justify-content: space-between;
             margin-bottom: 8px;
         }
-        .history-time {
-            font-size: 12px;
-            color: #888;
-        }
-        .history-device {
-            font-size: 12px;
-            color: #00897B;
-            font-weight: 500;
-        }
+        .history-time { font-size: 12px; color: #888; }
+        .history-device { font-size: 12px; color: #00897B; font-weight: 500; }
         .history-values {
             display: flex;
             justify-content: space-around;
@@ -346,13 +256,7 @@
             background: #f8f9fa;
             border-radius: 8px;
         }
-        .history-raw {
-            margin-top: 6px;
-            font-size: 11px;
-            color: #bbb;
-            font-family: monospace;
-        }
-        /* Chart */
+        .history-raw { margin-top: 6px; font-size: 11px; color: #bbb; font-family: monospace; }
         .chart-card {
             background: white;
             border-radius: 16px;
@@ -360,11 +264,7 @@
             margin-bottom: 16px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
-        .chart-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
+        .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
         .metric-tabs {
             display: flex;
             gap: 8px;
@@ -387,6 +287,9 @@
         #chartCanvas {
             width: 100%;
             height: 250px;
+            display: block;
+            background: #fafafa;
+            border-radius: 8px;
         }
         .stats-row {
             display: grid;
@@ -400,16 +303,8 @@
             background: #f8f9fa;
             border-radius: 10px;
         }
-        .stat-box .s-label {
-            font-size: 11px;
-            color: #888;
-        }
-        .stat-box .s-value {
-            font-size: 18px;
-            font-weight: 700;
-            margin-top: 4px;
-        }
-        /* Settings */
+        .stat-box .s-label { font-size: 11px; color: #888; }
+        .stat-box .s-value { font-size: 18px; font-weight: 700; margin-top: 4px; }
         .setting-card {
             background: white;
             border-radius: 16px;
@@ -417,11 +312,7 @@
             margin-bottom: 16px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
-        .setting-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
+        .setting-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
         .protocol-row {
             display: flex;
             justify-content: space-between;
@@ -429,17 +320,9 @@
             border-bottom: 1px solid #f0f0f0;
             font-size: 13px;
         }
-        .protocol-row:last-child {
-            border-bottom: none;
-        }
-        .protocol-row .p-label {
-            color: #666;
-        }
-        .protocol-row .p-value {
-            color: #333;
-            font-weight: 500;
-            font-family: monospace;
-        }
+        .protocol-row:last-child { border-bottom: none; }
+        .protocol-row .p-label { color: #666; }
+        .protocol-row .p-value { color: #333; font-weight: 500; font-family: monospace; }
         .example-box {
             background: #f8f9fa;
             padding: 12px;
@@ -454,7 +337,6 @@
             border-radius: 4px;
             font-size: 12px;
         }
-        /* Bottom Action Bar */
         .action-bar {
             position: fixed;
             bottom: 0;
@@ -477,33 +359,16 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .action-btn.primary {
-            background: #00897B;
-            color: white;
-        }
-        .action-btn.danger {
-            background: #E57373;
-            color: white;
-        }
-        .action-btn.secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-        .action-btn:active {
-            transform: scale(0.97);
-            opacity: 0.9;
-        }
-        /* Empty State */
+        .action-btn.primary { background: #00897B; color: white; }
+        .action-btn.danger { background: #E57373; color: white; }
+        .action-btn.secondary { background: #f0f0f0; color: #333; }
+        .action-btn:active { transform: scale(0.97); opacity: 0.9; }
         .empty-state {
             text-align: center;
             padding: 60px 20px;
             color: #999;
         }
-        .empty-state .icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-        /* Toast */
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
         .toast {
             position: fixed;
             bottom: 100px;
@@ -524,7 +389,6 @@
             transform: translateX(-50%) translateY(0);
             opacity: 1;
         }
-        /* Filter Chips */
         .filter-bar {
             display: flex;
             gap: 8px;
@@ -547,36 +411,26 @@
             color: white;
             border-color: #00897B;
         }
-        /* Hide Scrollbar */
-        ::-webkit-scrollbar {
-            display: none;
-        }
-        /* Small Screen */
+        ::-webkit-scrollbar { display: none; }
         @media (max-width: 360px) {
-            .data-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 8px;
-            }
-            .data-item .value {
-                font-size: 18px;
-            }
+            .data-grid { gap: 8px; }
+            .data-item .value { font-size: 18px; }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
     <div class="header">
         <h1>🔷 iBeacon 温湿度扫描器</h1>
         <div class="subtitle">RL_HT_Tag 6字节广播专用</div>
     </div>
-    <!-- Tab Bar -->
     <div class="tab-bar">
         <button class="tab-btn active" data-tab="scan" onclick="switchTab('scan')">扫描</button>
         <button class="tab-btn" data-tab="history" onclick="switchTab('history')">记录 <span class="badge" id="historyBadge" style="display:none">0</span></button>
         <button class="tab-btn" data-tab="chart" onclick="switchTab('chart')">图表</button>
         <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">设置</button>
     </div>
-    <!-- Scan Tab -->
+
+    <!-- ===== SCAN TAB ===== -->
     <div class="tab-content active" id="tab-scan">
         <div class="scan-control">
             <button class="scan-btn start" id="scanBtn" onclick="toggleScan()">
@@ -620,7 +474,8 @@
         </div>
         <div id="deviceList"></div>
     </div>
-    <!-- History Tab -->
+
+    <!-- ===== HISTORY TAB ===== -->
     <div class="tab-content" id="tab-history">
         <div class="filter-bar" id="deviceFilter">
             <button class="filter-chip active" onclick="filterHistory('all')">全部</button>
@@ -633,7 +488,8 @@
             </div>
         </div>
     </div>
-    <!-- Chart Tab -->
+
+    <!-- ===== CHART TAB ===== -->
     <div class="tab-content" id="tab-chart">
         <div class="chart-card">
             <div class="chart-title">📊 数据趋势曲线</div>
@@ -659,7 +515,8 @@
             </div>
         </div>
     </div>
-    <!-- Settings Tab -->
+
+    <!-- ===== SETTINGS TAB ===== -->
     <div class="tab-content" id="tab-settings">
         <div class="setting-card">
             <div class="setting-title">📋 设备数据协议说明</div>
@@ -667,34 +524,13 @@
                 <span class="p-label">Service UUID</span>
                 <span class="p-value">00000318-0000-1000-8000-00805f9b34fb</span>
             </div>
-            <div class="protocol-row">
-                <span class="p-label">有效数据长度</span>
-                <span class="p-value">6 Bytes</span>
-            </div>
-            <div class="protocol-row">
-                <span class="p-label">Byte0</span>
-                <span class="p-value">温度符号 00=正 / 01=负</span>
-            </div>
-            <div class="protocol-row">
-                <span class="p-label">Byte1</span>
-                <span class="p-value">温度整数(16进制)</span>
-            </div>
-            <div class="protocol-row">
-                <span class="p-label">Byte2</span>
-                <span class="p-value">温度小数 ÷100</span>
-            </div>
-            <div class="protocol-row">
-                <span class="p-label">Byte3</span>
-                <span class="p-value">湿度整数(16进制)</span>
-            </div>
-            <div class="protocol-row">
-                <span class="p-label">Byte4</span>
-                <span class="p-value">湿度小数 ÷100</span>
-            </div>
-            <div class="protocol-row">
-                <span class="p-label">Byte5</span>
-                <span class="p-value">电池电量 %</span>
-            </div>
+            <div class="protocol-row"><span class="p-label">有效数据长度</span><span class="p-value">6 Bytes</span></div>
+            <div class="protocol-row"><span class="p-label">Byte0</span><span class="p-value">温度符号 00=正 / 01=负</span></div>
+            <div class="protocol-row"><span class="p-label">Byte1</span><span class="p-value">温度整数(16进制)</span></div>
+            <div class="protocol-row"><span class="p-label">Byte2</span><span class="p-value">温度小数 ÷100</span></div>
+            <div class="protocol-row"><span class="p-label">Byte3</span><span class="p-value">湿度整数(16进制)</span></div>
+            <div class="protocol-row"><span class="p-label">Byte4</span><span class="p-value">湿度小数 ÷100</span></div>
+            <div class="protocol-row"><span class="p-label">Byte5</span><span class="p-value">电池电量 %</span></div>
             <div class="example-box">
                 <strong>解析示例：</strong><br>
                 原始广播：<code>0x001A45322A64</code><br>
@@ -720,11 +556,13 @@
             </p>
         </div>
     </div>
-    <!-- Toast弹窗 -->
+
     <div class="toast" id="toast"></div>
 
 <script>
-// ==================== 全局稳定配置 ====================
+// ============================================================
+//  全局配置
+// ============================================================
 const MAX_RECORD_COUNT = 1200;
 const DEVICE_OFFLINE_MS = 25000;
 const RECONNECT_DELAY = 2800;
@@ -732,9 +570,13 @@ const CLEAN_DEV_INTERVAL = 4000;
 const CHART_RESIZE_DELAY = 300;
 const SERVICE_UUID = "00000318-0000-1000-8000-00805f9b34fb";
 
-// 全局状态
+// ============================================================
+//  全局状态
+// ============================================================
 let isScanning = false;
+let isManualDisconnect = false;           // 🔧 新增：区分主动/被动断开
 let bluetoothDevice = null;
+let disconnectHandler = null;             // 🔧 新增：保存监听器引用用于移除
 let scanTimer = null;
 let reconnectTimer = null;
 let records = JSON.parse(localStorage.getItem('ibeacon_records') || '[]');
@@ -743,25 +585,24 @@ let chartMetric = 'temp';
 let currentFilter = 'all';
 let resizeTimer = null;
 
-// 自动记录持久化
 const autoRecordCheckbox = document.getElementById('autoRecord');
 autoRecordCheckbox.checked = localStorage.getItem('autoRecord') !== 'false';
 autoRecordCheckbox.addEventListener('change', e => {
     localStorage.setItem('autoRecord', e.target.checked);
 });
 
-// ==================== Tab切换 ====================
+// ============================================================
+//  Tab 切换
+// ============================================================
 function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-    const tabDom = document.getElementById(`tab-${tab}`);
-    tabDom.classList.add('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
     if (tab === 'history') renderHistory();
     if (tab === 'chart') renderChart();
 }
 
-// ==================== Toast提示 ====================
 function showToast(msg) {
     const toast = document.getElementById('toast');
     toast.textContent = msg;
@@ -769,7 +610,9 @@ function showToast(msg) {
     setTimeout(() => toast.classList.remove('show'), 2200);
 }
 
-// ==================== 广播数据解析器（强容错） ====================
+// ============================================================
+//  核心解析器（修复：温度直接存储为带符号数值字符串）
+// ============================================================
 function parseServiceData(rawHex) {
     if (!rawHex) return null;
     let hex = rawHex.replace(/0x|\s|\r|\n/g, '').toUpperCase();
@@ -787,23 +630,27 @@ function parseServiceData(rawHex) {
     const tempFrac = bytes[2];
     const humInt = bytes[3];
     const humFrac = bytes[4];
-    const battery = bytes[5];
-    if ([signByte, tempInt, tempFrac, humInt, humFrac, battery].some(v => v > 255)) return null;
+    let battery = bytes[5];
+    if (battery > 100) battery = 100;  // 🔧 电量限制0-100
+
     const isNegative = signByte === 0x01;
     const sign = isNegative ? -1 : 1;
     const temperature = sign * (tempInt + tempFrac / 100);
     const humidity = humInt + humFrac / 100;
+
     return {
-        temperature: temperature.toFixed(2),
+        temperature: temperature.toFixed(2),      // 已带符号，如 "-26.69" 或 "26.69"
         humidity: humidity.toFixed(2),
         battery: battery,
-        isNegative: isNegative,
+        isNegative: isNegative,                   // 保留供调试
         rawHex: `0x${hex}`,
         parseDetail: `符号:${isNegative?'负':'正'} | 温:${tempInt.toString(16).padStart(2,'0')}.${tempFrac.toString(16).padStart(2,'0')} | 湿:${humInt.toString(16).padStart(2,'0')}.${humFrac.toString(16).padStart(2,'0')} | 电量:${battery.toString(16).padStart(2,'0')}`
     };
 }
 
-// ==================== BLE扫描与自动重连核心 ====================
+// ============================================================
+//  BLE 扫描与重连（修复：监听器管理 + 主动断开标志）
+// ============================================================
 async function toggleScan() {
     if (isScanning) await stopScan();
     else await startScan();
@@ -811,7 +658,7 @@ async function toggleScan() {
 
 async function startScan() {
     if (window.location.protocol !== 'https:' && window.location.protocol !== 'http://localhost') {
-        showToast('仅HTTPS/localhost可用，本地file://无法调用蓝牙');
+        showToast('仅HTTPS/localhost可用');
         return;
     }
     if (!navigator.bluetooth) {
@@ -819,6 +666,7 @@ async function startScan() {
         return;
     }
     if (isScanning) return;
+
     try {
         showToast('请在弹窗选择RL_HT_Tag设备');
         const device = await navigator.bluetooth.requestDevice({
@@ -826,28 +674,43 @@ async function startScan() {
             optionalServices: [SERVICE_UUID]
         });
         bluetoothDevice = device;
-        // 断开自动重连监听
-        device.addEventListener('gattserverdisconnected', async () => {
+        isManualDisconnect = false;   // 🔧 重置标志
+
+        // 🔧 移除旧监听器，防止重复添加
+        if (disconnectHandler) {
+            device.removeEventListener('gattserverdisconnected', disconnectHandler);
+            disconnectHandler = null;
+        }
+        // 🔧 创建新监听器并保存引用
+        disconnectHandler = async () => {
+            if (isManualDisconnect) {
+                // 主动断开，不触发重连
+                return;
+            }
             showToast('设备断开，等待自动重连...');
             isScanning = false;
             updateScanUI();
             clearTimeout(reconnectTimer);
             reconnectTimer = setTimeout(async () => {
-                if (!isScanning) await startScan();
+                if (!isScanning && !isManualDisconnect) {
+                    await startScan();
+                }
             }, RECONNECT_DELAY);
-        });
+        };
+        device.addEventListener('gattserverdisconnected', disconnectHandler);
+
         const server = await device.gatt.connect();
         isScanning = true;
         updateScanUI();
         showToast(`连接成功：${device.name || '未知iBeacon温湿度标签'}`);
-        // 广播监听（Android主要数据源）
+
         if (device.watchAdvertisements) {
             await device.watchAdvertisements();
             device.addEventListener('advertisementreceived', handleAdvertisement);
         }
-        // GATT通知兜底
         await readGattNotify(server);
         startDeviceCleanTimer();
+
     } catch (err) {
         console.error('扫描启动失败', err);
         isScanning = false;
@@ -868,9 +731,11 @@ async function readGattNotify(server) {
                 if (ch.properties.notify) {
                     await ch.startNotifications();
                     ch.addEventListener('characteristicvaluechanged', ev => {
-                        const buf = new Uint8Array(ev.target.value.buffer);
-                        const hex = Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
-                        handleData(hex, bluetoothDevice.name || 'RL_HT_Tag', bluetoothDevice.id);
+                        // 🔧 修复 DataView 偏移量
+                        const buf = ev.target.value;
+                        const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+                        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                        handleData(hex, bluetoothDevice?.name || 'RL_HT_Tag', bluetoothDevice?.id || 'unknown');
                     });
                 }
             }
@@ -884,8 +749,9 @@ function handleAdvertisement(event) {
     const dev = event.device;
     const rssi = event.rssi;
     if (!event.manufacturerData) return;
-    event.manufacturerData.forEach(buf => {
-        const bytes = new Uint8Array(buf.buffer);
+    event.manufacturerData.forEach((buf, companyId) => {
+        // 🔧 修复 DataView 偏移量
+        const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
         const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
         handleData(hex, dev.name || 'RL_HT_Tag', dev.id, rssi);
     });
@@ -901,7 +767,7 @@ function handleData(rawHex, devName, devId, rssi = null) {
         deviceName: devName,
         deviceId: devId,
         rawData: parsed.rawHex,
-        temperature: parsed.temperature,
+        temperature: parsed.temperature,   // 已带符号
         humidity: parsed.humidity,
         battery: parsed.battery,
         isNegative: parsed.isNegative,
@@ -919,7 +785,6 @@ function handleData(rawHex, devName, devId, rssi = null) {
     }
 }
 
-// 定时清理离线设备
 function startDeviceCleanTimer() {
     if (scanTimer) clearInterval(scanTimer);
     scanTimer = setInterval(() => {
@@ -936,6 +801,7 @@ function startDeviceCleanTimer() {
 }
 
 async function stopScan() {
+    isManualDisconnect = true;   // 🔧 标记为主动断开
     isScanning = false;
     clearInterval(scanTimer);
     clearTimeout(reconnectTimer);
@@ -944,8 +810,15 @@ async function stopScan() {
     if (bluetoothDevice && bluetoothDevice.gatt.connected) {
         bluetoothDevice.gatt.disconnect();
     }
+    // 🔧 移除监听器
+    if (bluetoothDevice && disconnectHandler) {
+        bluetoothDevice.removeEventListener('gattserverdisconnected', disconnectHandler);
+        disconnectHandler = null;
+    }
     updateScanUI();
     showToast('已停止蓝牙扫描采集');
+    // 延迟重置标志，防止断开事件干扰
+    setTimeout(() => { isManualDisconnect = false; }, 500);
 }
 
 function updateScanUI() {
@@ -967,16 +840,19 @@ function updateScanUI() {
     }
 }
 
-// ==================== 实时UI渲染 ====================
+// ============================================================
+//  UI 渲染（修复：直接使用已带符号的 temperature）
+// ============================================================
 function updateLatestData(record) {
     document.getElementById('latestData').style.display = 'block';
-    const tempNum = parseFloat(record.temperature);
-    document.getElementById('latestTemp').textContent = (record.isNegative ? '-' : '') + tempNum.toFixed(2);
+    // 🔧 直接使用 record.temperature（已带符号）
+    document.getElementById('latestTemp').textContent = record.temperature;
     document.getElementById('latestHum').textContent = record.humidity;
     document.getElementById('latestBat').textContent = record.battery;
     document.getElementById('latestRaw').textContent = record.rawData;
     document.getElementById('parseDetail').textContent = record.parseDetail;
     document.getElementById('latestTime').textContent = formatTime(record.timestamp);
+    const tempNum = parseFloat(record.temperature);
     const tempEl = document.getElementById('latestTemp');
     tempEl.classList.remove('cold', 'hot');
     if (tempNum < 10) tempEl.classList.add('cold');
@@ -1002,7 +878,7 @@ function renderDeviceList() {
             <div class="device-values">
                 <div class="device-value">
                     <div class="v-label">温度</div>
-                    <div class="v-num" style="color:#E57373">${d.isNegative?'-':''}${d.temperature}°C</div>
+                    <div class="v-num" style="color:#E57373">${d.temperature}°C</div>
                 </div>
                 <div class="device-value">
                     <div class="v-label">湿度</div>
@@ -1019,7 +895,9 @@ function renderDeviceList() {
     wrap.innerHTML = html;
 }
 
-// ==================== 历史记录模块 ====================
+// ============================================================
+//  历史记录
+// ============================================================
 function renderHistory() {
     const wrap = document.getElementById('historyList');
     updateBadge();
@@ -1041,7 +919,7 @@ function renderHistory() {
             <div class="history-values">
                 <div class="device-value">
                     <div class="v-label">温度</div>
-                    <div class="v-num" style="color:#E57373">${r.isNegative?'-':''}${r.temperature}°C</div>
+                    <div class="v-num" style="color:#E57373">${r.temperature}°C</div>
                 </div>
                 <div class="device-value">
                     <div class="v-label">湿度</div>
@@ -1085,7 +963,9 @@ function updateBadge() {
     }
 }
 
-// ==================== 图表模块（修复event报错） ====================
+// ============================================================
+//  图表（修复：温度数据不再重复乘以符号）
+// ============================================================
 function setChartMetric(metric, el) {
     chartMetric = metric;
     document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
@@ -1098,12 +978,13 @@ function renderChart() {
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    const w = rect.width || 300;
+    const h = rect.height || 250;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
-    const w = rect.width;
-    const h = rect.height;
     ctx.clearRect(0, 0, w, h);
+
     if (records.length === 0) {
         ctx.fillStyle = '#999';
         ctx.font = '14px sans-serif';
@@ -1111,12 +992,14 @@ function renderChart() {
         ctx.fillText('暂无数据，扫描设备后生成趋势曲线', w / 2, h / 2);
         return;
     }
+
     const data = records.slice(0, 50).reverse();
     const values = data.map(r => {
-        if (chartMetric === 'temp') return parseFloat(r.temperature) * (r.isNegative ? -1 : 1);
+        if (chartMetric === 'temp') return parseFloat(r.temperature);   // 🔧 直接解析，不再乘符号
         if (chartMetric === 'hum') return parseFloat(r.humidity);
         return r.battery;
     });
+
     const min = Math.min(...values);
     const max = Math.max(...values);
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
@@ -1124,9 +1007,11 @@ function renderChart() {
     document.getElementById('statMin').textContent = min.toFixed(1) + unit;
     document.getElementById('statMax').textContent = max.toFixed(1) + unit;
     document.getElementById('statAvg').textContent = avg.toFixed(1) + unit;
+
     const colorMap = { temp: '#E57373', hum: '#42A5F5', bat: '#66BB6A' };
     const lineColor = colorMap[chartMetric];
-    // 网格线
+
+    // 网格
     ctx.strokeStyle = '#f0f0f0';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
@@ -1136,12 +1021,12 @@ function renderChart() {
         ctx.lineTo(w - 10, y);
         ctx.stroke();
     }
-    // 折线绘制
+
     if (values.length > 1) {
         const range = max - min || 1;
         const stepX = (w - 50) / (values.length - 1);
         ctx.strokeStyle = lineColor;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
         values.forEach((v, i) => {
             const x = 40 + i * stepX;
@@ -1149,34 +1034,41 @@ function renderChart() {
             i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         });
         ctx.stroke();
-        // 填充面积
-        ctx.fillStyle = lineColor + '20';
+        // 面积填充 (透明度调整)
+        ctx.fillStyle = lineColor + '40';   // 🔧 提高透明度 20→40
         ctx.lineTo(40 + (values.length - 1) * stepX, h - 30);
         ctx.lineTo(40, h - 30);
         ctx.closePath();
         ctx.fill();
-        // 数据圆点
+        // 数据点
         ctx.fillStyle = lineColor;
         values.forEach((v, i) => {
             const x = 40 + i * stepX;
             const y = 30 + (h - 60) * (1 - (v - min) / range);
             ctx.beginPath();
-            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
             ctx.fill();
+            // 加白色边框更清晰
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
         });
     }
-    // Y轴刻度文字
+
+    // Y轴刻度
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     for (let i = 0; i <= 4; i++) {
         const val = min + (max - min) * (1 - i / 4);
         const y = 30 + (h - 60) * i / 4;
-        ctx.fillText(val.toFixed(0), 35, y + 3);
+        ctx.fillText(val.toFixed(1), 35, y + 4);
     }
 }
 
-// ==================== CSV导出与清空数据 ====================
+// ============================================================
+//  CSV 导出 & 数据清除
+// ============================================================
 function escapeCsvField(str) {
     if (!str) return '';
     let s = String(str);
@@ -1230,7 +1122,9 @@ function clearAllData() {
     showToast('所有记录与在线设备已清空');
 }
 
-// ==================== 工具函数 ====================
+// ============================================================
+//  工具函数
+// ============================================================
 function formatTime(iso) {
     const d = new Date(iso);
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -1246,16 +1140,16 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ==================== 页面初始化 ====================
+// ============================================================
+//  初始化 & 响应式
+// ============================================================
 updateBadge();
-// 窗口防抖重绘图表
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
         if (document.getElementById('tab-chart').classList.contains('active')) renderChart();
     }, CHART_RESIZE_DELAY);
 });
-// 页面后台监听
 document.addEventListener('visibilitychange', () => {
     if (document.hidden && isScanning) {
         console.log('页面切后台，维持BLE连接');
