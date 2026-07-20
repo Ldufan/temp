@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RL_HT_Tag 温湿度读取器</title>
+    <title>通用 BLE 温湿度读取器</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 500px;
-            margin: 50px auto;
+            max-width: 550px;
+            margin: 30px auto;
             padding: 20px;
             background: #f7f9fc;
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
         h1 {
-            font-size: 24px;
+            font-size: 22px;
             color: #1a3b5d;
             text-align: center;
             margin-bottom: 24px;
@@ -23,8 +23,8 @@
         .card {
             background: white;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 18px;
+            margin-bottom: 18px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         .info-row {
@@ -44,12 +44,8 @@
             font-weight: 600;
             color: #0b2b44;
         }
-        .value.temp {
-            color: #d35400;
-        }
-        .value.humid {
-            color: #2980b9;
-        }
+        .value.temp { color: #d35400; }
+        .value.humid { color: #2980b9; }
         button {
             width: 100%;
             padding: 14px;
@@ -63,9 +59,7 @@
             transition: background 0.2s;
             margin-top: 10px;
         }
-        button:hover {
-            background: #005bb5;
-        }
+        button:hover { background: #005bb5; }
         button:disabled {
             background: #a0b8cc;
             cursor: not-allowed;
@@ -82,8 +76,8 @@
             padding: 10px;
             border-radius: 8px;
             font-family: monospace;
-            font-size: 14px;
-            margin-top: 8px;
+            font-size: 13px;
+            margin-top: 6px;
         }
         .note {
             font-size: 13px;
@@ -91,15 +85,23 @@
             margin-top: 12px;
             text-align: center;
         }
+        .device-name {
+            font-weight: 700;
+            color: #007aff;
+        }
     </style>
 </head>
 <body>
 
-    <h1>🌡️ RL_HT_Tag 温湿度</h1>
+    <h1>🌡️ BLE 温湿度采集</h1>
 
     <div class="card">
         <div class="info-row">
-            <span class="label">设备状态</span>
+            <span class="label">📱 设备</span>
+            <span class="value device-name" id="deviceName">未选择</span>
+        </div>
+        <div class="info-row">
+            <span class="label">状态</span>
             <span class="value" id="statusText">未连接</span>
         </div>
         <div class="info-row">
@@ -111,18 +113,18 @@
             <span class="value humid" id="humidity">-- %</span>
         </div>
         <div class="info-row">
-            <span class="label">📶 信号强度 (RSSI)</span>
+            <span class="label">📶 RSSI</span>
             <span class="value" id="rssi">-- dBm</span>
         </div>
         <div class="info-row" style="flex-direction:column; align-items:stretch;">
-            <span class="label">📋 原始广播数据 (Service Data 0x0318)</span>
+            <span class="label">📋 Service Data (0x0318)</span>
             <div class="raw" id="rawData">等待数据…</div>
         </div>
     </div>
 
-    <button id="connectBtn">🔗 连接并读取</button>
-    <div class="status" id="statusDetail">点击按钮开始扫描设备</div>
-    <div class="note">* 需要 Chrome 80+ 且支持 Web Bluetooth，页面需在 HTTPS 或 localhost 下运行。</div>
+    <button id="connectBtn">🔍 扫描并选择设备</button>
+    <div class="status" id="statusDetail">点击按钮后，在弹窗中选择您的 BLE 设备</div>
+    <div class="note">* 支持 Chrome 80+，需 HTTPS/localhost，可选择任意广播 Service Data 0x0318 的设备。</div>
 
     <script>
         (function() {
@@ -130,6 +132,7 @@
             const connectBtn = document.getElementById('connectBtn');
             const statusText = document.getElementById('statusText');
             const statusDetail = document.getElementById('statusDetail');
+            const deviceNameEl = document.getElementById('deviceName');
             const tempSpan = document.getElementById('temperature');
             const humSpan = document.getElementById('humidity');
             const rssiSpan = document.getElementById('rssi');
@@ -138,69 +141,43 @@
             let device = null;
             let watching = false;
 
-            // 解析温度：字节0符号(00正/01负)，字节1整数，字节2小数(两位)
+            // ---------- 解析函数 ----------
+            // 温度：字节0符号(00正/01负)，字节1整数，字节2小数(两位)
             function parseTemperature(hexString) {
-                // 去掉可能的前缀 "0x"
                 const clean = hexString.replace(/^0x/, '');
-                // 确保长度为偶数
                 const padded = clean.length % 2 === 0 ? clean : '0' + clean;
                 const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
-                if (bytes.length < 3) {
-                    throw new Error('数据长度不足，至少需要3字节');
-                }
+                if (bytes.length < 3) throw new Error('数据长度不足');
                 const sign = bytes[0] === 0x00 ? 1 : -1;
                 const integer = bytes[1];
-                const fraction = bytes[2];          // 例如 0x45 = 69
-                // 假设小数部分为两位（0~99），实际值 = 整数 + fraction/100
-                const temp = sign * (integer + fraction / 100);
-                return temp;
+                const fraction = bytes[2];
+                return sign * (integer + fraction / 100);
             }
 
-            // 尝试解析湿度（根据常见传感器，可能后3字节类似，但未提供规则，此处仅作占位）
-            // 这里我们尝试用后两字节（索引3,4）作为整数+小数，单位%，若数据不足则返回 null
+            // 湿度：尝试用字节3整数，字节4小数（占位，可修改）
             function parseHumidity(hexString) {
                 const clean = hexString.replace(/^0x/, '');
                 const padded = clean.length % 2 === 0 ? clean : '0' + clean;
                 const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
                 if (bytes.length >= 5) {
-                    // 假设湿度: 字节3为整数，字节4为小数（两位）
                     const intPart = bytes[3];
                     const fracPart = bytes[4];
-                    // 有些传感器湿度整数+小数，范围0~100
-                    const humidity = intPart + fracPart / 100;
-                    // 合理性检查（0~100）
-                    if (humidity >= 0 && humidity <= 100) {
-                        return humidity;
-                    }
+                    const h = intPart + fracPart / 100;
+                    if (h >= 0 && h <= 100) return h;
                 }
-                return null; // 无法解析
+                return null;
             }
 
-            // 更新界面
-            function updateDisplay(temp, humidity, rssi, rawHex) {
-                if (temp !== undefined && temp !== null) {
-                    tempSpan.textContent = temp.toFixed(2) + ' ℃';
-                } else {
-                    tempSpan.textContent = '-- ℃';
-                }
-                if (humidity !== undefined && humidity !== null) {
-                    humSpan.textContent = humidity.toFixed(1) + ' %';
-                } else {
-                    humSpan.textContent = '-- %';
-                }
-                if (rssi !== undefined && rssi !== null) {
-                    rssiSpan.textContent = rssi + ' dBm';
-                } else {
-                    rssiSpan.textContent = '-- dBm';
-                }
-                if (rawHex) {
-                    rawSpan.textContent = '0x' + rawHex.toUpperCase();
-                } else {
-                    rawSpan.textContent = '无数据';
-                }
+            // ---------- 更新 UI ----------
+            function updateDisplay(temp, humidity, rssi, rawHex, name) {
+                if (name) deviceNameEl.textContent = name;
+                tempSpan.textContent = (temp !== null && temp !== undefined) ? temp.toFixed(2) + ' ℃' : '-- ℃';
+                humSpan.textContent = (humidity !== null && humidity !== undefined) ? humidity.toFixed(1) + ' %' : '-- %';
+                rssiSpan.textContent = (rssi !== null && rssi !== undefined) ? rssi + ' dBm' : '-- dBm';
+                rawSpan.textContent = rawHex ? '0x' + rawHex.toUpperCase() : '无数据';
             }
 
-            // 处理接收到的广告数据
+            // ---------- 处理广播事件 ----------
             function handleAdvertisement(event) {
                 const adv = event;
                 const serviceData = adv.serviceData;
@@ -208,23 +185,14 @@
                     statusDetail.textContent = '未包含 Service Data';
                     return;
                 }
+
                 // 查找 UUID 0x0318
-                const uuid = '00000318-0000-1000-8000-00805f9b34fb';
+                const targetUUID = '00000318-0000-1000-8000-00805f9b34fb';
                 let dataView = null;
                 for (const [key, value] of serviceData) {
-                    if (key === uuid) {
+                    if (key === targetUUID || key.includes('0318')) {
                         dataView = value;
                         break;
-                    }
-                }
-                if (!dataView) {
-                    // 尝试用短 UUID 0x0318
-                    const shortUuid = '0318';
-                    for (const [key, value] of serviceData) {
-                        if (key.includes(shortUuid)) {
-                            dataView = value;
-                            break;
-                        }
                     }
                 }
                 if (!dataView) {
@@ -233,477 +201,105 @@
                     return;
                 }
 
-                // 转为十六进制字符串
+                // 转十六进制
                 const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
                 let hex = '';
                 for (let i = 0; i < bytes.length; i++) {
                     hex += bytes[i].toString(16).padStart(2, '0');
                 }
-                rawSpan.textContent = '0x' + hex.toUpperCase();
 
-                // 解析温度
-                let temp = null;
-                let humid = null;
+                let temp = null, humid = null;
                 try {
                     temp = parseTemperature(hex);
                 } catch (e) {
                     statusDetail.textContent = '温度解析失败: ' + e.message;
                 }
-                // 尝试解析湿度（占位规则）
                 try {
                     humid = parseHumidity(hex);
-                } catch (e) {
-                    // 忽略
-                }
+                } catch (e) {}
 
-                // RSSI
                 const rssi = adv.rssi;
-
-                // 更新显示
-                updateDisplay(temp, humid, rssi, hex);
-                statusText.textContent = '已连接，接收数据';
-                statusDetail.textContent = '最新数据更新于 ' + new Date().toLocaleTimeString();
+                const name = adv.name || device.name || '未知设备';
+                updateDisplay(temp, humid, rssi, hex, name);
+                statusText.textContent = '接收数据中';
+                statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
             }
 
-            // 连接并开始监听广播
+            // ---------- 连接/断开 ----------
             async function connectAndRead() {
                 if (watching) {
-                    // 如果已经连接，则断开
+                    // 断开
                     try {
-                        if (device && device.gatt) {
-                            await device.gatt.disconnect();
-                        }
+                        if (device && device.gatt) await device.gatt.disconnect();
                     } catch (e) {}
                     watching = false;
                     device = null;
                     statusText.textContent = '已断开';
-                    statusDetail.textContent = '点击按钮重新连接';
-                    connectBtn.textContent = '🔗 连接并读取';
-                    updateDisplay(null, null, null, null);
+                    statusDetail.textContent = '点击按钮重新扫描';
+                    connectBtn.textContent = '🔍 扫描并选择设备';
+                    updateDisplay(null, null, null, null, '未选择');
                     return;
                 }
 
                 try {
                     connectBtn.disabled = true;
                     statusDetail.textContent = '正在扫描设备…';
-                    // 请求设备（根据设备名称过滤）
+
+                    // 使用 acceptAllDevices 让用户自由选择
                     device = await navigator.bluetooth.requestDevice({
-                        filters: [{ name: 'RL_HT_Tag' }],
-                        optionalServices: []  // 不需要额外服务，watch 广告即可
+                        acceptAllDevices: true,
+                        optionalServices: ['generic_access']  // 仅用于满足规范，实际无需连接服务
                     });
 
+                    statusDetail.textContent = '已选择: ' + (device.name || '未命名设备');
+                    deviceNameEl.textContent = device.name || '未命名';
+
+                    // 连接 GATT
                     statusDetail.textContent = '正在连接 GATT…';
-                    // 连接 GATT（watchAdvertisements 需要连接状态）
                     const server = await device.gatt.connect();
                     statusText.textContent = 'GATT 已连接';
 
-                    // 检查是否支持 watchAdvertisements
+                    // 检查 watchAdvertisements
                     if (!device.watchAdvertisements) {
-                        throw new Error('当前浏览器不支持 watchAdvertisements，请使用最新 Chrome 并启用实验性 Web Bluetooth 功能。');
+                        throw new Error('浏览器不支持 watchAdvertisements，请使用最新 Chrome 并开启实验特性。');
                     }
 
-                    statusDetail.textContent = '正在开启广播监听…';
+                    statusDetail.textContent = '正在监听广播…';
                     await device.watchAdvertisements();
-
-                    // 监听广告事件
                     device.addEventListener('advertisementreceived', handleAdvertisement);
 
                     watching = true;
                     connectBtn.textContent = '🔌 断开连接';
-                    statusDetail.textContent = '已开始监听广播数据，等待设备发送…';
-                    // 如果立即有数据，会触发事件
-                    // 同时尝试主动读取一次（可选）
-                    // 部分设备可能不会持续广播，可触发重连
+                    statusDetail.textContent = '已开始监听，等待广播数据…';
 
                 } catch (error) {
                     console.error(error);
                     statusText.textContent = '错误';
                     statusDetail.textContent = '❌ ' + error.message;
-                    // 重置状态
                     if (device) {
                         try { device.gatt.disconnect(); } catch (e) {}
                         device = null;
                     }
                     watching = false;
-                    connectBtn.textContent = '🔗 连接并读取';
-                } finally {
-                    connectBtn.disabled = false;
-                }
-            }
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RL_HT_Tag 温湿度读取器</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 500px;
-            margin: 50px auto;
-            padding: 20px;
-            background: #f7f9fc;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        }
-        h1 {
-            font-size: 24px;
-            color: #1a3b5d;
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        .label {
-            color: #5a6c7d;
-            font-weight: 500;
-        }
-        .value {
-            font-weight: 600;
-            color: #0b2b44;
-        }
-        .value.temp {
-            color: #d35400;
-        }
-        .value.humid {
-            color: #2980b9;
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: #007aff;
-            color: white;
-            border: none;
-            border-radius: 30px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 10px;
-        }
-        button:hover {
-            background: #005bb5;
-        }
-        button:disabled {
-            background: #a0b8cc;
-            cursor: not-allowed;
-        }
-        .status {
-            text-align: center;
-            color: #5a6c7d;
-            font-size: 14px;
-            margin-top: 12px;
-        }
-        .raw {
-            word-break: break-all;
-            background: #f0f2f5;
-            padding: 10px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 14px;
-            margin-top: 8px;
-        }
-        .note {
-            font-size: 13px;
-            color: #7f8c8d;
-            margin-top: 12px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-
-    <h1>🌡️ RL_HT_Tag 温湿度</h1>
-
-    <div class="card">
-        <div class="info-row">
-            <span class="label">设备状态</span>
-            <span class="value" id="statusText">未连接</span>
-        </div>
-        <div class="info-row">
-            <span class="label">🌡️ 温度</span>
-            <span class="value temp" id="temperature">-- ℃</span>
-        </div>
-        <div class="info-row">
-            <span class="label">💧 湿度</span>
-            <span class="value humid" id="humidity">-- %</span>
-        </div>
-        <div class="info-row">
-            <span class="label">📶 信号强度 (RSSI)</span>
-            <span class="value" id="rssi">-- dBm</span>
-        </div>
-        <div class="info-row" style="flex-direction:column; align-items:stretch;">
-            <span class="label">📋 原始广播数据 (Service Data 0x0318)</span>
-            <div class="raw" id="rawData">等待数据…</div>
-        </div>
-    </div>
-
-    <button id="connectBtn">🔗 连接并读取</button>
-    <div class="status" id="statusDetail">点击按钮开始扫描设备</div>
-    <div class="note">* 需要 Chrome 80+ 且支持 Web Bluetooth，页面需在 HTTPS 或 localhost 下运行。</div>
-
-    <script>
-        (function() {
-            // DOM 元素
-            const connectBtn = document.getElementById('connectBtn');
-            const statusText = document.getElementById('statusText');
-            const statusDetail = document.getElementById('statusDetail');
-            const tempSpan = document.getElementById('temperature');
-            const humSpan = document.getElementById('humidity');
-            const rssiSpan = document.getElementById('rssi');
-            const rawSpan = document.getElementById('rawData');
-
-            let device = null;
-            let watching = false;
-
-            // 解析温度：字节0符号(00正/01负)，字节1整数，字节2小数(两位)
-            function parseTemperature(hexString) {
-                // 去掉可能的前缀 "0x"
-                const clean = hexString.replace(/^0x/, '');
-                // 确保长度为偶数
-                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
-                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
-                if (bytes.length < 3) {
-                    throw new Error('数据长度不足，至少需要3字节');
-                }
-                const sign = bytes[0] === 0x00 ? 1 : -1;
-                const integer = bytes[1];
-                const fraction = bytes[2];          // 例如 0x45 = 69
-                // 假设小数部分为两位（0~99），实际值 = 整数 + fraction/100
-                const temp = sign * (integer + fraction / 100);
-                return temp;
-            }
-
-            // 尝试解析湿度（根据常见传感器，可能后3字节类似，但未提供规则，此处仅作占位）
-            // 这里我们尝试用后两字节（索引3,4）作为整数+小数，单位%，若数据不足则返回 null
-            function parseHumidity(hexString) {
-                const clean = hexString.replace(/^0x/, '');
-                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
-                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
-                if (bytes.length >= 5) {
-                    // 假设湿度: 字节3为整数，字节4为小数（两位）
-                    const intPart = bytes[3];
-                    const fracPart = bytes[4];
-                    // 有些传感器湿度整数+小数，范围0~100
-                    const humidity = intPart + fracPart / 100;
-                    // 合理性检查（0~100）
-                    if (humidity >= 0 && humidity <= 100) {
-                        return humidity;
-                    }
-                }
-                return null; // 无法解析
-            }
-
-            // 更新界面
-            function updateDisplay(temp, humidity, rssi, rawHex) {
-                if (temp !== undefined && temp !== null) {
-                    tempSpan.textContent = temp.toFixed(2) + ' ℃';
-                } else {
-                    tempSpan.textContent = '-- ℃';
-                }
-                if (humidity !== undefined && humidity !== null) {
-                    humSpan.textContent = humidity.toFixed(1) + ' %';
-                } else {
-                    humSpan.textContent = '-- %';
-                }
-                if (rssi !== undefined && rssi !== null) {
-                    rssiSpan.textContent = rssi + ' dBm';
-                } else {
-                    rssiSpan.textContent = '-- dBm';
-                }
-                if (rawHex) {
-                    rawSpan.textContent = '0x' + rawHex.toUpperCase();
-                } else {
-                    rawSpan.textContent = '无数据';
-                }
-            }
-
-            // 处理接收到的广告数据
-            function handleAdvertisement(event) {
-                const adv = event;
-                const serviceData = adv.serviceData;
-                if (!serviceData) {
-                    statusDetail.textContent = '未包含 Service Data';
-                    return;
-                }
-                // 查找 UUID 0x0318
-                const uuid = '00000318-0000-1000-8000-00805f9b34fb';
-                let dataView = null;
-                for (const [key, value] of serviceData) {
-                    if (key === uuid) {
-                        dataView = value;
-                        break;
-                    }
-                }
-                if (!dataView) {
-                    // 尝试用短 UUID 0x0318
-                    const shortUuid = '0318';
-                    for (const [key, value] of serviceData) {
-                        if (key.includes(shortUuid)) {
-                            dataView = value;
-                            break;
-                        }
-                    }
-                }
-                if (!dataView) {
-                    statusDetail.textContent = '未找到 Service Data (0x0318)';
-                    rawSpan.textContent = '无匹配数据';
-                    return;
-                }
-
-                // 转为十六进制字符串
-                const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
-                let hex = '';
-                for (let i = 0; i < bytes.length; i++) {
-                    hex += bytes[i].toString(16).padStart(2, '0');
-                }
-                rawSpan.textContent = '0x' + hex.toUpperCase();
-
-                // 解析温度
-                let temp = null;
-                let humid = null;
-                try {
-                    temp = parseTemperature(hex);
-                } catch (e) {
-                    statusDetail.textContent = '温度解析失败: ' + e.message;
-                }
-                // 尝试解析湿度（占位规则）
-                try {
-                    humid = parseHumidity(hex);
-                } catch (e) {
-                    // 忽略
-                }
-
-                // RSSI
-                const rssi = adv.rssi;
-
-                // 更新显示
-                updateDisplay(temp, humid, rssi, hex);
-                statusText.textContent = '已连接，接收数据';
-                statusDetail.textContent = '最新数据更新于 ' + new Date().toLocaleTimeString();
-            }
-
-            // 连接并开始监听广播
-            async function connectAndRead() {
-                if (watching) {
-                    // 如果已经连接，则断开
-                    try {
-                        if (device && device.gatt) {
-                            await device.gatt.disconnect();
-                        }
-                    } catch (e) {}
-                    watching = false;
-                    device = null;
-                    statusText.textContent = '已断开';
-                    statusDetail.textContent = '点击按钮重新连接';
-                    connectBtn.textContent = '🔗 连接并读取';
-                    updateDisplay(null, null, null, null);
-                    return;
-                }
-
-                try {
-                    connectBtn.disabled = true;
-                    statusDetail.textContent = '正在扫描设备…';
-                    // 请求设备（根据设备名称过滤）
-                    device = await navigator.bluetooth.requestDevice({
-                        filters: [{ name: 'RL_HT_Tag' }],
-                        optionalServices: []  // 不需要额外服务，watch 广告即可
-                    });
-
-                    statusDetail.textContent = '正在连接 GATT…';
-                    // 连接 GATT（watchAdvertisements 需要连接状态）
-                    const server = await device.gatt.connect();
-                    statusText.textContent = 'GATT 已连接';
-
-                    // 检查是否支持 watchAdvertisements
-                    if (!device.watchAdvertisements) {
-                        throw new Error('当前浏览器不支持 watchAdvertisements，请使用最新 Chrome 并启用实验性 Web Bluetooth 功能。');
-                    }
-
-                    statusDetail.textContent = '正在开启广播监听…';
-                    await device.watchAdvertisements();
-
-                    // 监听广告事件
-                    device.addEventListener('advertisementreceived', handleAdvertisement);
-
-                    watching = true;
-                    connectBtn.textContent = '🔌 断开连接';
-                    statusDetail.textContent = '已开始监听广播数据，等待设备发送…';
-                    // 如果立即有数据，会触发事件
-                    // 同时尝试主动读取一次（可选）
-                    // 部分设备可能不会持续广播，可触发重连
-
-                } catch (error) {
-                    console.error(error);
-                    statusText.textContent = '错误';
-                    statusDetail.textContent = '❌ ' + error.message;
-                    // 重置状态
-                    if (device) {
-                        try { device.gatt.disconnect(); } catch (e) {}
-                        device = null;
-                    }
-                    watching = false;
-                    connectBtn.textContent = '🔗 连接并读取';
+                    connectBtn.textContent = '🔍 扫描并选择设备';
                 } finally {
                     connectBtn.disabled = false;
                 }
             }
 
-            // 点击事件
+            // ---------- 事件绑定 ----------
             connectBtn.addEventListener('click', connectAndRead);
 
-            // 页面关闭时清理
             window.addEventListener('beforeunload', async () => {
                 if (device && watching) {
-                    try {
-                        await device.gatt.disconnect();
-                    } catch (e) {}
+                    try { await device.gatt.disconnect(); } catch (e) {}
                 }
             });
 
-            // 初始化显示
-            updateDisplay(null, null, null, null);
+            // 初始化
+            updateDisplay(null, null, null, null, '未选择');
 
-            // 检查浏览器支持
-            if (!navigator.bluetooth) {
-                statusText.textContent = '不支持';
-                statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth，请使用 Chrome 80+';
-                connectBtn.disabled = true;
-            }
-        })();
-    </script>
-</body>
-</html>
-            // 点击事件
-            connectBtn.addEventListener('click', connectAndRead);
-
-            // 页面关闭时清理
-            window.addEventListener('beforeunload', async () => {
-                if (device && watching) {
-                    try {
-                        await device.gatt.disconnect();
-                    } catch (e) {}
-                }
-            });
-
-            // 初始化显示
-            updateDisplay(null, null, null, null);
-
-            // 检查浏览器支持
+            // 浏览器兼容性
             if (!navigator.bluetooth) {
                 statusText.textContent = '不支持';
                 statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth，请使用 Chrome 80+';
