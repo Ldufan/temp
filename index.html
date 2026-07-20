@@ -2,419 +2,1010 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BLE 温湿度扫描器（自动匹配）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a1628">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BLE 温湿度监测</title>
     <style>
-        * { box-sizing: border-box; }
+        /* ---------- reset & base ---------- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 650px;
-            margin: 20px auto;
-            padding: 20px;
-            background: #f4f6f9;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #0a1628;
+            color: #e8edf5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 16px 12px 30px;
         }
-        h1 { font-size: 22px; color: #1a3b5d; text-align: center; }
-        .sub { text-align: center; color: #6c7a89; font-size: 14px; margin-top: -6px; margin-bottom: 20px; }
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        #app {
+            max-width: 480px;
+            width: 100%;
         }
-        .info-row {
+
+        /* ---------- header ---------- */
+        .app-header {
             display: flex;
             justify-content: space-between;
-            padding: 6px 0;
-            border-bottom: 1px solid #eee;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 0 4px;
         }
-        .info-row:last-child { border-bottom: none; }
-        .label { color: #5a6c7d; font-weight: 500; }
-        .value { font-weight: 600; color: #0b2b44; }
-        .value.temp { color: #d35400; }
-        .value.humid { color: #2980b9; }
-        .input-group {
+        .app-title {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #60b0ff, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .status-badge {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin: 10px 0;
-        }
-        .input-group label {
-            font-weight: 500;
-            color: #1a3b5d;
-            white-space: nowrap;
-        }
-        .input-group input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 20px;
-            font-size: 16px;
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: #007aff;
-            color: white;
-            border: none;
-            border-radius: 30px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 10px;
-        }
-        button:hover { background: #005bb5; }
-        button:disabled { background: #a0b8cc; cursor: not-allowed; }
-        .status { text-align: center; color: #5a6c7d; font-size: 14px; margin-top: 8px; }
-        .log-area {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            padding: 10px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-            margin-top: 6px;
-        }
-        .raw {
-            background: #f0f2f5;
-            padding: 8px;
-            border-radius: 6px;
-            font-family: monospace;
             font-size: 13px;
-            margin-top: 4px;
-            word-break: break-all;
+            color: #94a3b8;
+            background: rgba(255, 255, 255, 0.06);
+            padding: 6px 14px 6px 12px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(4px);
         }
-        .note { font-size: 13px; color: #7f8c8d; text-align: center; margin-top: 10px; }
-        .device-name { color: #007aff; font-weight: 700; }
-        .warning {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 12px;
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #475569;
+            transition: background 0.3s, box-shadow 0.3s;
+            flex-shrink: 0;
+        }
+        .status-dot.scanning {
+            background: #22d3ee;
+            box-shadow: 0 0 12px rgba(34, 211, 238, 0.6);
+            animation: pulse-dot 1.2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.5);
+                opacity: 0.6;
+            }
+        }
+        .status-dot.error {
+            background: #f87171;
+            box-shadow: 0 0 12px rgba(248, 113, 113, 0.4);
+        }
+        .record-count {
+            font-weight: 500;
+            color: #e8edf5;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        /* ---------- main card ---------- */
+        .main-card {
+            background: linear-gradient(145deg, #111d35, #0e172a);
+            border-radius: 28px;
+            padding: 28px 22px 22px;
+            margin-bottom: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        .main-card::before {
+            content: '';
+            position: absolute;
+            top: -40%;
+            right: -20%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(96, 176, 255, 0.08), transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .main-card .temp-wrap {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 6px;
+            position: relative;
+            z-index: 1;
+        }
+        .main-card .temp-value {
+            font-size: 72px;
+            font-weight: 300;
+            letter-spacing: -2px;
+            line-height: 1.1;
+            color: #ffffff;
+            transition: color 0.4s;
+        }
+        .main-card .temp-value.cold {
+            color: #7dd3fc;
+        }
+        .main-card .temp-value.mild {
+            color: #fcd34d;
+        }
+        .main-card .temp-value.hot {
+            color: #fca5a5;
+        }
+        .main-card .temp-unit {
+            font-size: 28px;
+            font-weight: 400;
+            color: #94a3b8;
+            margin-left: 2px;
+        }
+        .main-card .temp-label {
+            text-align: center;
+            font-size: 14px;
+            color: #64748b;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-top: -2px;
+            margin-bottom: 18px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* metrics row */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 6px;
+            position: relative;
+            z-index: 1;
+        }
+        .metric-item {
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 12px 6px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            transition: background 0.2s;
+        }
+        .metric-item .label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 4px;
+        }
+        .metric-item .value {
+            font-size: 20px;
+            font-weight: 500;
+            color: #e8edf5;
+        }
+        .metric-item .value .sub {
+            font-size: 13px;
+            font-weight: 400;
+            color: #94a3b8;
+            margin-left: 2px;
+        }
+        .metric-item .value.rssi-val {
+            color: #94a3b8;
+        }
+        .metric-item.battery .value {
+            color: #4ade80;
+        }
+        .metric-item.humidity .value {
+            color: #60b0ff;
+        }
+
+        /* ---------- no-data placeholder ---------- */
+        .no-data {
+            text-align: center;
+            padding: 20px 0 8px;
+            color: #475569;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+        }
+        .no-data .icon {
+            font-size: 32px;
+            margin-bottom: 6px;
+            opacity: 0.5;
+        }
+
+        /* ---------- history ---------- */
+        .history-section {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 16px 0 4px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            margin-bottom: 14px;
+        }
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 18px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .history-header h3 {
+            font-size: 15px;
+            font-weight: 500;
+            color: #c8d0dc;
+            letter-spacing: 0.3px;
+        }
+        .history-header .clear-btn {
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 8px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .history-header .clear-btn:hover {
+            background: rgba(248, 113, 113, 0.12);
+            color: #f87171;
+        }
+        .history-list {
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 4px 6px 6px;
+        }
+        .history-list::-webkit-scrollbar {
+            width: 3px;
+        }
+        .history-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .history-list::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+
+        .history-item {
+            display: grid;
+            grid-template-columns: 80px 1fr 1fr 1fr 50px;
+            gap: 4px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            align-items: center;
+            transition: background 0.15s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .history-item .h-time {
+            color: #94a3b8;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+        }
+        .history-item .h-temp {
+            font-weight: 500;
+            color: #fcd34d;
+        }
+        .history-item .h-humid {
+            color: #60b0ff;
+        }
+        .history-item .h-batt {
+            color: #4ade80;
+        }
+        .history-item .h-rssi {
+            color: #94a3b8;
+            font-size: 12px;
+            text-align: right;
+        }
+        .history-empty {
+            text-align: center;
+            color: #475569;
+            padding: 28px 0 20px;
             font-size: 14px;
         }
-        .btn-sm {
-            width: auto;
-            padding: 6px 16px;
-            font-size: 13px;
-            background: #6c757d;
-            margin: 0;
+        .history-empty .icon {
+            font-size: 28px;
+            margin-bottom: 6px;
+            opacity: 0.4;
         }
-        .spec-ref {
-            background: #eaf4ff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            margin: 8px 0;
+
+        /* ---------- actions ---------- */
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 2px;
+        }
+        .actions .btn {
+            flex: 1;
+            min-width: 100px;
+            padding: 14px 16px;
+            border: none;
+            border-radius: 16px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #e8edf5;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .actions .btn:active {
+            transform: scale(0.97);
+        }
+        .actions .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.25);
+        }
+        .actions .btn-primary:active {
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+        }
+        .actions .btn-primary.scanning {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            box-shadow: 0 4px 16px rgba(220, 38, 38, 0.25);
+        }
+        .actions .btn-primary.scanning:active {
+            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+        }
+        .actions .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+        .actions .btn-secondary:active {
+            background: rgba(255, 255, 255, 0.10);
+        }
+        .actions .btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .actions .btn .icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        /* ---------- toast ---------- */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            padding: 12px 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #e8edf5;
+            font-size: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            pointer-events: none;
+            z-index: 999;
+            max-width: 90%;
+            text-align: center;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .toast.error {
+            border-color: rgba(248, 113, 113, 0.3);
+        }
+        .toast.success {
+            border-color: rgba(74, 222, 128, 0.3);
+        }
+
+        /* ---------- responsive ---------- */
+        @media (max-width: 400px) {
+            .main-card .temp-value {
+                font-size: 56px;
+            }
+            .main-card .temp-unit {
+                font-size: 22px;
+            }
+            .metrics {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+            }
+            .metric-item .value {
+                font-size: 17px;
+            }
+            .history-item {
+                font-size: 12px;
+                grid-template-columns: 70px 1fr 1fr 1fr 40px;
+                padding: 6px 8px;
+            }
+            .actions .btn {
+                font-size: 13px;
+                padding: 12px 12px;
+                min-width: 80px;
+            }
+        }
+        @media (min-width: 600px) {
+            body {
+                padding: 30px 20px;
+            }
+            .main-card .temp-value {
+                font-size: 88px;
+            }
+        }
+
+        /* ---------- utils ---------- */
+        .hidden {
+            display: none !important;
+        }
+        .text-muted {
+            color: #64748b;
+        }
+        .mt-8 {
+            margin-top: 8px;
+        }
+        .gap-8 {
+            gap: 8px;
         }
     </style>
 </head>
 <body>
 
-    <h1>📡 BLE 温湿度扫描器（自动匹配）</h1>
-    <div class="sub">自动尝试所有 Service Data / 厂商数据</div>
+    <div id="app">
 
-    <div class="warning">
-        ⚠️ 需启用 Chrome 实验性功能：<br>
-        <code>chrome://flags/#enable-experimental-web-platform-features</code> → 开启并重启浏览器。
-    </div>
+        <!-- header -->
+        <header class="app-header">
+            <span class="app-title">🌡️ BLE 监测</span>
+            <div class="status-badge">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">未连接</span>
+                <span style="opacity:0.3;margin:0 2px;">|</span>
+                <span>📋 <span class="record-count" id="recordCount">0</span></span>
+            </div>
+        </header>
 
-    <div class="card">
-        <div class="info-row">
-            <span class="label">📱 设备</span>
-            <span class="value device-name" id="deviceName">等待扫描…</span>
-        </div>
-        <div class="info-row">
-            <span class="label">状态</span>
-            <span class="value" id="statusText">未开始</span>
-        </div>
-        <div class="info-row">
-            <span class="label">🌡️ 温度</span>
-            <span class="value temp" id="temperature">-- ℃</span>
-        </div>
-        <div class="info-row">
-            <span class="label">💧 湿度</span>
-            <span class="value humid" id="humidity">-- %</span>
-        </div>
-        <div class="info-row">
-            <span class="label">📶 RSSI</span>
-            <span class="value" id="rssi">-- dBm</span>
-        </div>
-        <div class="info-row" style="flex-direction:column; align-items:stretch;">
-            <span class="label">📋 使用的数据源</span>
-            <div class="raw" id="dataSource">等待数据…</div>
-        </div>
-    </div>
+        <!-- main card -->
+        <section class="main-card" id="mainCard">
+            <div class="temp-wrap">
+                <span class="temp-value" id="tempDisplay">--</span>
+                <span class="temp-unit">°C</span>
+            </div>
+            <div class="temp-label" id="tempLabel">等待数据</div>
 
-    <div class="input-group">
-        <label for="uuidFilter">可选指定 UUID 包含：</label>
-        <input type="text" id="uuidFilter" value="" placeholder="留空则自动匹配所有数据块" />
-    </div>
+            <div class="metrics">
+                <div class="metric-item humidity">
+                    <div class="label">💧 湿度</div>
+                    <div class="value" id="humidDisplay">-- <span class="sub">%</span></div>
+                </div>
+                <div class="metric-item battery">
+                    <div class="label">🔋 电量</div>
+                    <div class="value" id="battDisplay">-- <span class="sub">%</span></div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">📶 RSSI</div>
+                    <div class="value rssi-val" id="rssiDisplay">-- <span class="sub">dBm</span></div>
+                </div>
+            </div>
 
-    <button id="scanBtn">🔍 开始扫描</button>
-    <div class="status" id="statusDetail">点击开始扫描，浏览器将请求蓝牙权限</div>
+            <div class="no-data" id="noDataMsg">
+                <div class="icon">📡</div>
+                <div>点击「开始扫描」接收广播</div>
+            </div>
+        </section>
 
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-weight:600; color:#1a3b5d;">📋 详细日志</span>
-            <button id="clearLogBtn" class="btn-sm">清空</button>
+        <!-- history -->
+        <section class="history-section">
+            <div class="history-header">
+                <h3>📜 历史记录</h3>
+                <button class="clear-btn" id="clearHistoryBtn" title="清空所有历史">清空</button>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="history-empty" id="historyEmpty">
+                    <div class="icon">📭</div>
+                    <div>暂无记录</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- actions -->
+        <div class="actions">
+            <button class="btn btn-primary" id="scanBtn">
+                <span class="icon">▶</span> 开始扫描
+            </button>
+            <button class="btn btn-secondary" id="exportBtn">
+                <span class="icon">📥</span> 导出 CSV
+            </button>
         </div>
-        <div class="log-area" id="logArea">[系统] 准备就绪，请点击“开始扫描”。</div>
-    </div>
 
-    <div class="spec-ref">
-        📖 <strong>解析规则</strong><br>
-        • 温度：字节0（00正/01负），字节1（整数），字节2（小数/100）<br>
-        • 湿度：字节3（整数），字节4（小数/100）<br>
-        • 自动尝试所有 Service Data 和厂商数据，找到第一个符合格式的数据块即显示。
-    </div>
-
-    <div class="note">
-        * 如果未指定 UUID，将尝试解析所有数据块。<br>
-        * 若自动匹配失败，请查看日志中打印的所有 UUID，手动填写匹配字符串。
+        <!-- toast -->
+        <div class="toast" id="toast"></div>
     </div>
 
     <script>
-        (function() {
-            const scanBtn = document.getElementById('scanBtn');
-            const statusText = document.getElementById('statusText');
-            const statusDetail = document.getElementById('statusDetail');
-            const deviceNameEl = document.getElementById('deviceName');
-            const tempSpan = document.getElementById('temperature');
-            const humSpan = document.getElementById('humidity');
-            const rssiSpan = document.getElementById('rssi');
-            const dataSourceEl = document.getElementById('dataSource');
-            const uuidFilterInput = document.getElementById('uuidFilter');
-            const logArea = document.getElementById('logArea');
-            const clearLogBtn = document.getElementById('clearLogBtn');
+        // ============================================================
+        //  CONFIG
+        // ============================================================
+        // 用户指定的服务 UUID（注意：实际使用时请确保与设备广播一致）
+        const SERVICE_UUID = '000003180-0000-1000-8000-00805f9b34fb';
+        // 备用：如果上述无效，可尝试用户原始格式（但可能不合规）
+        // const SERVICE_UUID = '00000318-0000-1000-3000-00805fb34fb';
 
-            let scanController = null;
-            let isScanning = false;
+        const DB_NAME = 'db-ble-monitor-db';
+        const STORE_NAME = 'store-records';
+        const MAX_HISTORY_DISPLAY = 200; // 界面最多显示条数
 
-            function appendLog(msg, type = 'info') {
-                const timestamp = new Date().toLocaleTimeString();
-                const prefix = type === 'error' ? '❌' : (type === 'success' ? '✅' : 'ℹ️');
-                logArea.textContent += `[${timestamp}] ${prefix} ${msg}\n`;
-                logArea.scrollTop = logArea.scrollHeight;
-            }
-            clearLogBtn.addEventListener('click', () => { logArea.textContent = ''; });
+        // ============================================================
+        //  STATE
+        // ============================================================
+        let isScanning = false;
+        let records = []; // 内存缓存（最新在前）
+        let db = null;
+        let lastData = null; // 最后一次解析的数据
 
-            // ---------- 解析函数 ----------
-            function parseTemperature(hexString) {
-                const clean = hexString.replace(/^0x/, '');
-                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
-                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
-                if (bytes.length < 3) return null;
-                const sign = bytes[0] === 0x00 ? 1 : -1;
-                const integer = bytes[1];
-                const fraction = bytes[2];
-                return sign * (integer + fraction / 100);
-            }
+        // DOM refs
+        const $ = id => document.getElementById(id);
+        const statusDot = $('statusDot');
+        const statusText = $('statusText');
+        const recordCount = $('recordCount');
+        const tempDisplay = $('tempDisplay');
+        const tempLabel = $('tempLabel');
+        const humidDisplay = $('humidDisplay');
+        const battDisplay = $('battDisplay');
+        const rssiDisplay = $('rssiDisplay');
+        const noDataMsg = $('noDataMsg');
+        const historyList = $('historyList');
+        const historyEmpty = $('historyEmpty');
+        const scanBtn = $('scanBtn');
+        const exportBtn = $('exportBtn');
+        const clearHistoryBtn = $('clearHistoryBtn');
+        const toast = $('toast');
 
-            function parseHumidity(hexString) {
-                const clean = hexString.replace(/^0x/, '');
-                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
-                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
-                if (bytes.length >= 5) {
-                    const intPart = bytes[3];
-                    const fracPart = bytes[4];
-                    const h = intPart + fracPart / 100;
-                    if (h >= 0 && h <= 100) return h;
-                }
-                return null;
-            }
-
-            function updateDisplay(temp, humidity, rssi, sourceDesc, name) {
-                if (name) deviceNameEl.textContent = name;
-                tempSpan.textContent = (temp !== null && temp !== undefined) ? temp.toFixed(2) + ' ℃' : '-- ℃';
-                humSpan.textContent = (humidity !== null && humidity !== undefined) ? humidity.toFixed(1) + ' %' : '-- %';
-                rssiSpan.textContent = (rssi !== null && rssi !== undefined) ? rssi + ' dBm' : '-- dBm';
-                dataSourceEl.textContent = sourceDesc || '无数据';
-            }
-
-            // ---------- 尝试解析数据块 ----------
-            function tryParseData(hexData, sourceLabel) {
-                if (!hexData || hexData.length < 6) return null;
-                let temp = null, humid = null;
-                try {
-                    temp = parseTemperature(hexData);
-                } catch (e) {}
-                try {
-                    humid = parseHumidity(hexData);
-                } catch (e) {}
-                if (temp !== null || humid !== null) {
-                    return { temp, humid, source: sourceLabel };
-                }
-                return null;
-            }
-
-            // ---------- 处理扫描结果 ----------
-            function handleScanResult(event) {
-                const result = event;
-                appendLog('收到广播包', 'info');
-
-                // 原始广播包（调试）
-                try {
-                    const rawBytes = new Uint8Array(result.rawData.buffer);
-                    let rawHex = '';
-                    for (let i = 0; i < rawBytes.length; i++) {
-                        rawHex += rawBytes[i].toString(16).padStart(2, '0') + ' ';
+        // ============================================================
+        //  INDEXED DB
+        // ============================================================
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = (e) => {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains(STORE_NAME)) {
+                        const store = d.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                        store.createIndex('time', 'time', { unique: false });
                     }
-                    appendLog(`完整广播包: ${rawHex.trim()}`, 'info');
-                } catch (e) {}
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
 
-                const deviceName = result.name || '未知';
-                deviceNameEl.textContent = deviceName;
+        function saveRecord(db, record) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.add(record);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
 
-                const serviceData = result.serviceData;
-                const manufacturerData = result.manufacturerData;
-                const filterStr = uuidFilterInput.value.trim();
-                let found = false;
-
-                // 1. 检查 Service Data
-                if (serviceData) {
-                    const uuids = Array.from(serviceData.keys());
-                    appendLog(`Service Data UUIDs: ${uuids.join(', ')}`, 'info');
-
-                    for (const [uuid, dataView] of serviceData) {
-                        // 如果指定了过滤字符串，则跳过不匹配的
-                        if (filterStr && !uuid.toLowerCase().includes(filterStr.toLowerCase())) {
-                            continue;
-                        }
-                        const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
-                        let hex = '';
-                        for (let i = 0; i < bytes.length; i++) {
-                            hex += bytes[i].toString(16).padStart(2, '0');
-                        }
-                        appendLog(`  尝试 UUID ${uuid}: 0x${hex.toUpperCase()}`, 'info');
-                        const result = tryParseData(hex, `Service Data (${uuid})`);
-                        if (result) {
-                            appendLog(`✅ 从 ${result.source} 解析成功`, 'success');
-                            updateDisplay(result.temp, result.humid, result.rssi || result.rssi, result.source, deviceName);
-                            statusText.textContent = '扫描中';
-                            statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
-                            found = true;
-                            break; // 找到第一个成功的就停止
-                        }
+        function loadAllRecords(db) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const index = store.index('time');
+                const req = index.openCursor(null, 'prev'); // 最新在前
+                const result = [];
+                req.onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if (cursor) {
+                        result.push(cursor.value);
+                        cursor.continue();
+                    } else {
+                        resolve(result);
                     }
-                }
+                };
+                req.onerror = () => reject(req.error);
+            });
+        }
 
-                // 2. 如果 Service Data 没找到，尝试厂商数据
-                if (!found && manufacturerData) {
-                    appendLog('尝试从厂商数据解析...', 'info');
-                    for (const [companyId, dataView] of manufacturerData) {
-                        const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
-                        let hex = '';
-                        for (let i = 0; i < bytes.length; i++) {
-                            hex += bytes[i].toString(16).padStart(2, '0');
-                        }
-                        appendLog(`  厂商数据 0x${companyId.toString(16).padStart(4, '0')}: 0x${hex.toUpperCase()}`, 'info');
-                        const result = tryParseData(hex, `厂商数据 (0x${companyId.toString(16).padStart(4, '0')})`);
-                        if (result) {
-                            appendLog(`✅ 从 ${result.source} 解析成功`, 'success');
-                            updateDisplay(result.temp, result.humid, result.rssi || result.rssi, result.source, deviceName);
-                            statusText.textContent = '扫描中';
-                            statusDetail.textContent = '最新数据: ' + new Date().toLocaleTimeString();
-                            found = true;
-                            break;
-                        }
-                    }
-                }
+        function clearAllRecords(db) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.clear();
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
 
-                if (!found) {
-                    appendLog('⚠️ 未在任何数据块中找到有效的温湿度数据', 'error');
-                    updateDisplay(null, null, result.rssi, '未解析到数据', deviceName);
-                    statusText.textContent = '扫描中（无有效数据）';
-                    statusDetail.textContent = '尝试其他数据块...';
-                }
+        function deleteRecord(db, id) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.delete(id);
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        // ============================================================
+        //  BLE
+        // ============================================================
+        async function startScan() {
+            if (!navigator.bluetooth || !navigator.bluetooth.requestLEScan) {
+                showToast('⚠️ 当前浏览器不支持 BLE 广播扫描', 'error');
+                return false;
             }
 
-            // ---------- 扫描控制 ----------
-            async function toggleScan() {
+            try {
+                const scan = await navigator.bluetooth.requestLEScan({
+                    filters: [{ services: [SERVICE_UUID] }],
+                    keepRepeatedDevices: true,
+                    acceptAllAdvertisements: false,
+                });
+                isScanning = true;
+                updateScanUI(true);
+                showToast('✅ 扫描已启动，等待广播数据...', 'success');
+
+                // 监听广播
+                navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisementReceived);
+
+                // 自动停止扫描（可选），但这里让用户手动停止
+                return true;
+            } catch (err) {
+                console.error('requestLEScan error:', err);
+                let msg = '扫描启动失败: ';
+                if (err.message && err.message.includes('choosing')) {
+                    msg += '用户取消或未选择设备';
+                } else if (err.message && err.message.includes('permission')) {
+                    msg += '请允许蓝牙权限';
+                } else {
+                    msg += err.message || '未知错误';
+                }
+                showToast('⚠️ ' + msg, 'error');
+                updateScanUI(false);
+                return false;
+            }
+        }
+
+        function stopScan() {
+            if (!isScanning) return;
+            try {
+                navigator.bluetooth.stopLEScan();
+            } catch (e) { /* ignore */ }
+            navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisementReceived);
+            isScanning = false;
+            updateScanUI(false);
+            showToast('⏹️ 扫描已停止', '');
+        }
+
+        function onAdvertisementReceived(event) {
+            // 获取服务数据
+            const serviceData = event.serviceData;
+            if (!serviceData) return;
+
+            const dataView = serviceData.get(SERVICE_UUID);
+            if (!dataView) {
+                // 尝试用原始UUID（如果不同）
+                // 有些浏览器可能规范化了UUID，这里不做复杂处理
+                return;
+            }
+
+            // 读取6字节
+            if (dataView.byteLength < 6) {
+                console.warn('数据长度不足6字节:', dataView.byteLength);
+                return;
+            }
+
+            const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, 6);
+
+            // 解析
+            const sign = bytes[0]; // 0x00 = 正, 0x01 = 负
+            const tempInt = bytes[1];
+            const tempFrac = bytes[2];
+            const humidInt = bytes[3];
+            const humidFrac = bytes[4];
+            const battery = bytes[5];
+
+            let temperature = (sign === 0 ? 1 : -1) * (tempInt + tempFrac / 100);
+            let humidity = humidInt + humidFrac / 100;
+            let rssi = event.rssi !== undefined ? event.rssi : -100;
+
+            // 简单校验
+            if (battery > 100 || battery < 0) {
+                // 电量可能不准确，但保留
+            }
+
+            const now = new Date();
+            const record = {
+                time: now.toISOString(),
+                timestamp: now.getTime(),
+                temperature: Math.round(temperature * 100) / 100,
+                humidity: Math.round(humidity * 100) / 100,
+                battery: Math.min(100, Math.max(0, battery)),
+                rssi: rssi,
+            };
+
+            // 更新UI
+            updateMainDisplay(record);
+            lastData = record;
+
+            // 保存到IndexedDB
+            if (db) {
+                saveRecord(db, record).then(() => {
+                    // 重新加载并刷新列表
+                    refreshHistory();
+                }).catch(err => {
+                    console.error('保存记录失败:', err);
+                });
+            } else {
+                // 如果db还没初始化，先存到内存，稍后同步
+                records.unshift(record);
+                if (records.length > 1000) records.pop();
+                renderHistory();
+                updateRecordCount();
+            }
+        }
+
+        // ============================================================
+        //  UI 更新
+        // ============================================================
+        function updateScanUI(scanning) {
+            if (scanning) {
+                statusDot.className = 'status-dot scanning';
+                statusText.textContent = '扫描中';
+                scanBtn.textContent = '⏹ 停止扫描';
+                scanBtn.className = 'btn btn-primary scanning';
+                noDataMsg.style.display = 'none';
+            } else {
+                statusDot.className = 'status-dot';
+                statusText.textContent = '已停止';
+                scanBtn.textContent = '▶ 开始扫描';
+                scanBtn.className = 'btn btn-primary';
+                if (!lastData) {
+                    noDataMsg.style.display = 'block';
+                }
+            }
+        }
+
+        function updateMainDisplay(record) {
+            const t = record.temperature;
+            const h = record.humidity;
+            const b = record.battery;
+            const r = record.rssi;
+
+            // 温度
+            tempDisplay.textContent = t.toFixed(1);
+            // 颜色
+            tempDisplay.className = 'temp-value';
+            if (t < 10) tempDisplay.classList.add('cold');
+            else if (t < 28) tempDisplay.classList.add('mild');
+            else tempDisplay.classList.add('hot');
+
+            // 标签
+            tempLabel.textContent = t < 10 ? '❄️ 凉爽' : t < 28 ? '🌤️ 舒适' : '☀️ 温暖';
+
+            // 湿度
+            humidDisplay.innerHTML = h.toFixed(1) + ' <span class="sub">%</span>';
+
+            // 电量
+            battDisplay.innerHTML = b + ' <span class="sub">%</span>';
+
+            // RSSI
+            rssiDisplay.innerHTML = r + ' <span class="sub">dBm</span>';
+
+            // 隐藏无数据提示
+            noDataMsg.style.display = 'none';
+        }
+
+        function updateRecordCount() {
+            const count = records.length;
+            recordCount.textContent = count;
+        }
+
+        // ============================================================
+        //  HISTORY 渲染
+        // ============================================================
+        function renderHistory() {
+            const list = historyList;
+            // 移除空状态
+            const empty = historyEmpty;
+            if (records.length === 0) {
+                list.innerHTML = '';
+                list.appendChild(empty);
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            // 只显示最近 MAX_HISTORY_DISPLAY 条
+            const show = records.slice(0, MAX_HISTORY_DISPLAY);
+            let html = '';
+            for (const r of show) {
+                const timeStr = formatTime(r.time);
+                html += `
+                    <div class="history-item">
+                        <span class="h-time">${timeStr}</span>
+                        <span class="h-temp">${r.temperature.toFixed(1)}°C</span>
+                        <span class="h-humid">${r.humidity.toFixed(1)}%</span>
+                        <span class="h-batt">${r.battery}%</span>
+                        <span class="h-rssi">${r.rssi}</span>
+                    </div>
+                `;
+            }
+            list.innerHTML = html;
+            updateRecordCount();
+        }
+
+        function formatTime(isoStr) {
+            try {
+                const d = new Date(isoStr);
+                return d.toLocaleTimeString('zh-CN', { hour12: false });
+            } catch {
+                return isoStr;
+            }
+        }
+
+        async function refreshHistory() {
+            if (!db) return;
+            try {
+                const all = await loadAllRecords(db);
+                records = all;
+                renderHistory();
+            } catch (err) {
+                console.error('刷新历史失败:', err);
+            }
+        }
+
+        // ============================================================
+        //  CSV 导出
+        // ============================================================
+        function exportCSV() {
+            if (records.length === 0) {
+                showToast('⚠️ 没有数据可导出', 'error');
+                return;
+            }
+
+            // 按时间正序导出（最早在前）
+            const sorted = [...records].reverse();
+            const header = '时间,温度(°C),湿度(%),电量(%),RSSI(dBm)';
+            const rows = sorted.map(r => {
+                const time = new Date(r.time).toLocaleString('zh-CN', { hour12: false });
+                return `${time},${r.temperature.toFixed(1)},${r.humidity.toFixed(1)},${r.battery},${r.rssi}`;
+            });
+            const csv = [header, ...rows].join('\n');
+
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ble_data_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`✅ 导出 ${records.length} 条记录`, 'success');
+        }
+
+        // ============================================================
+        //  TOAST
+        // ============================================================
+        let toastTimer = null;
+
+        function showToast(msg, type) {
+            toast.textContent = msg;
+            toast.className = 'toast';
+            if (type === 'error') toast.classList.add('error');
+            if (type === 'success') toast.classList.add('success');
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2800);
+        }
+
+        // ============================================================
+        //  INIT
+        // ============================================================
+        async function init() {
+            // 打开数据库
+            try {
+                db = await openDB();
+                // 加载历史
+                const all = await loadAllRecords(db);
+                records = all;
+                renderHistory();
+
+                // 如果有数据，显示最新一条
+                if (records.length > 0) {
+                    const latest = records[0];
+                    updateMainDisplay(latest);
+                    lastData = latest;
+                }
+            } catch (err) {
+                console.error('数据库初始化失败:', err);
+                // 降级：使用内存存储
+                showToast('⚠️ 存储初始化失败，数据仅保留在内存', 'error');
+            }
+
+            // 事件绑定
+            scanBtn.addEventListener('click', async () => {
                 if (isScanning) {
-                    if (scanController) {
-                        scanController.stop();
-                        scanController = null;
-                    }
-                    navigator.bluetooth.removeEventListener('advertisementreceived', handleScanResult);
-                    isScanning = false;
-                    scanBtn.textContent = '🔍 开始扫描';
-                    statusText.textContent = '已停止';
-                    statusDetail.textContent = '扫描已停止';
-                    appendLog('扫描已停止', 'info');
+                    stopScan();
                     return;
                 }
-
-                try {
-                    scanBtn.disabled = true;
-                    statusDetail.textContent = '正在请求扫描…';
-                    appendLog('尝试启动 requestLEScan', 'info');
-
-                    if (!navigator.bluetooth || !navigator.bluetooth.requestLEScan) {
-                        throw new Error('浏览器不支持 requestLEScan，请启用实验性 Web Platform Features 并重启 Chrome。');
-                    }
-
-                    const options = {
-                        acceptAllAdvertisements: true,
-                        keepRepeatedDevices: true
-                    };
-
-                    scanController = await navigator.bluetooth.requestLEScan(options);
-                    navigator.bluetooth.addEventListener('advertisementreceived', handleScanResult);
-
-                    isScanning = true;
-                    scanBtn.textContent = '⏹️ 停止扫描';
-                    statusText.textContent = '扫描中';
-                    statusDetail.textContent = '正在监听广播…';
-                    deviceNameEl.textContent = '等待设备…';
-                    updateDisplay(null, null, null, '等待数据...', '');
-                    appendLog('扫描已启动，等待广播数据', 'success');
-
-                } catch (error) {
-                    console.error(error);
-                    appendLog(`错误: ${error.message}`, 'error');
-                    statusText.textContent = '错误';
-                    statusDetail.textContent = '❌ ' + error.message;
-                    if (scanController) {
-                        try { scanController.stop(); } catch (e) {}
-                        scanController = null;
-                    }
-                    isScanning = false;
-                    scanBtn.textContent = '🔍 开始扫描';
-                } finally {
-                    scanBtn.disabled = false;
-                }
-            }
-
-            scanBtn.addEventListener('click', toggleScan);
-
-            window.addEventListener('beforeunload', () => {
-                if (scanController) {
-                    try { scanController.stop(); } catch (e) {}
-                }
-                navigator.bluetooth.removeEventListener('advertisementreceived', handleScanResult);
+                await startScan();
             });
 
-            // 初始化
-            updateDisplay(null, null, null, '未开始', '');
-            if (!navigator.bluetooth) {
-                statusText.textContent = '不支持';
-                statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth';
-                scanBtn.disabled = true;
-                appendLog('浏览器不支持 Web Bluetooth', 'error');
-            } else {
-                appendLog('Web Bluetooth 可用，请点击“开始扫描”', 'info');
-                appendLog('提示：留空 UUID 将自动尝试所有数据块', 'info');
+            exportBtn.addEventListener('click', exportCSV);
+
+            clearHistoryBtn.addEventListener('click', async () => {
+                if (records.length === 0) {
+                    showToast('没有历史可清空', '');
+                    return;
+                }
+                if (!confirm('确定要清空所有历史记录吗？')) return;
+                try {
+                    if (db) {
+                        await clearAllRecords(db);
+                    }
+                    records = [];
+                    renderHistory();
+                    // 如果当前没有新数据，恢复占位
+                    if (!isScanning) {
+                        noDataMsg.style.display = 'block';
+                        tempDisplay.textContent = '--';
+                        tempLabel.textContent = '等待数据';
+                        humidDisplay.innerHTML = '-- <span class="sub">%</span>';
+                        battDisplay.innerHTML = '-- <span class="sub">%</span>';
+                        rssiDisplay.innerHTML = '-- <span class="sub">dBm</span>';
+                        lastData = null;
+                    }
+                    showToast('🗑️ 已清空所有历史', 'success');
+                } catch (err) {
+                    console.error('清空历史失败:', err);
+                    showToast('清空失败: ' + err.message, 'error');
+                }
+            });
+
+            // 页面关闭时停止扫描
+            window.addEventListener('beforeunload', () => {
+                if (isScanning) {
+                    try { navigator.bluetooth.stopLEScan(); } catch (e) {}
+                }
+            });
+
+            // 更新状态
+            updateScanUI(false);
+            if (records.length === 0) {
+                noDataMsg.style.display = 'block';
             }
-        })();
+        }
+
+        // 启动
+        document.addEventListener('DOMContentLoaded', init);
+
+        // 如果DOM已加载，直接初始化
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            init();
+        }
+
+        console.log('🌡️ BLE 温湿度监测 PWA 已加载');
+        console.log('📡 服务 UUID:', SERVICE_UUID);
+        console.log('💾 数据库:', DB_NAME, ' / 存储:', STORE_NAME);
     </script>
+
 </body>
 </html>
