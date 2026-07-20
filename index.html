@@ -422,7 +422,12 @@ async function startScan() {
       acceptAllAdvertisements: true,
       keepRepeatedDevices: true,
     });
-    scanBluetooth.addEventListener('advertisementreceived', handleAdvertisement);
+    // 兼容不同 Chrome 版本的 API
+      if (typeof scanBluetooth.addEventListener === 'function') {
+        scanBluetooth.addEventListener('advertisementreceived', handleAdvertisement);
+      } else {
+        scanBluetooth.onadvertisementreceived = handleAdvertisement;
+      }
     isScanning = true;
     updateScanUI();
     return true;
