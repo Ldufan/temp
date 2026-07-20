@@ -2,1257 +2,714 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#00897B">
-    <title>iBeacon RL_HT_Tag 温湿度扫描记录器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RL_HT_Tag 温湿度读取器</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #f0f2f5;
-            color: #333;
-            min-height: 100vh;
-            padding-bottom: 80px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f7f9fc;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
-        .header {
-            background: linear-gradient(135deg, #00897B, #00695C);
-            color: white;
-            padding: 20px 16px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        h1 {
+            font-size: 24px;
+            color: #1a3b5d;
+            text-align: center;
+            margin-bottom: 24px;
         }
-        .header h1 { font-size: 20px; font-weight: 600; }
-        .header .subtitle { font-size: 12px; opacity: 0.85; margin-top: 4px; }
-        .tab-bar {
-            display: flex;
+        .card {
             background: white;
-            border-bottom: 1px solid #e0e0e0;
-            position: sticky;
-            top: 68px;
-            z-index: 99;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
-        .tab-btn {
-            flex: 1;
-            padding: 14px 8px;
-            border: none;
-            background: none;
-            font-size: 14px;
-            color: #666;
-            cursor: pointer;
-            position: relative;
-            transition: all 0.3s;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            color: #5a6c7d;
             font-weight: 500;
         }
-        .tab-btn.active { color: #00897B; }
-        .tab-btn.active::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 20%;
-            right: 20%;
-            height: 3px;
-            background: #00897B;
-            border-radius: 3px 3px 0 0;
-        }
-        .tab-btn .badge {
-            display: inline-block;
-            background: #E57373;
-            color: white;
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 10px;
-            margin-left: 4px;
-            vertical-align: middle;
-        }
-        .tab-content { display: none; padding: 16px; animation: fadeIn 0.3s ease; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .scan-control {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-        .scan-btn {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            border: none;
-            font-size: 16px;
+        .value {
             font-weight: 600;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
+            color: #0b2b44;
         }
-        .scan-btn.start {
-            background: linear-gradient(135deg, #00897B, #00695C);
-            box-shadow: 0 4px 15px rgba(0,137,123,0.4);
+        .value.temp {
+            color: #d35400;
         }
-        .scan-btn.stop {
-            background: linear-gradient(135deg, #E57373, #D32F2F);
-            box-shadow: 0 4px 15px rgba(229,115,115,0.4);
+        .value.humid {
+            color: #2980b9;
         }
-        .scan-btn:active { transform: scale(0.95); }
-        .scan-btn.scanning { animation: pulse 1.5s infinite; }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0,137,123,0.4); }
-            70% { box-shadow: 0 0 0 20px rgba(0,137,123,0); }
-            100% { box-shadow: 0 0 0 0 rgba(0,137,123,0); }
-        }
-        .scan-status { margin-top: 12px; font-size: 14px; color: #666; }
-        .scan-status.scanning { color: #00897B; font-weight: 500; }
-        .toggle-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 16px;
-            gap: 8px;
-        }
-        .toggle-switch {
-            position: relative;
-            width: 48px;
-            height: 26px;
-        }
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #ccc;
-            border-radius: 26px;
-            transition: 0.3s;
-        }
-        .toggle-slider::before {
-            content: "";
-            position: absolute;
-            height: 20px;
-            width: 20px;
-            left: 3px;
-            bottom: 3px;
-            background: white;
-            border-radius: 50%;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-            transition: 0.3s;
-        }
-        .toggle-switch input:checked + .toggle-slider { background: #00897B; }
-        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
-        .toggle-label { font-size: 14px; color: #666; }
-
-        /* 筛选区域（界面保留，但逻辑已禁用） */
-        .filter-area {
-            background: white;
-            border-radius: 16px;
-            padding: 16px 20px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 12px;
-        }
-        .filter-area label {
-            font-size: 13px;
-            color: #555;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .filter-area input[type="number"],
-        .filter-area input[type="text"] {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 6px 10px;
-            font-size: 13px;
-            width: 80px;
-            background: #fafafa;
-            transition: 0.2s;
-        }
-        .filter-area input[type="text"] { width: 120px; }
-        .filter-area input:focus {
-            border-color: #00897B;
-            outline: none;
-            background: white;
-        }
-        .filter-area .filter-btn {
-            background: #00897B;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 6px 18px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .filter-area .filter-btn:active { transform: scale(0.95); }
-        .filter-area .filter-hint {
-            font-size: 12px;
-            color: #999;
-            margin-left: auto;
-        }
-
-        .latest-card {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            border-left: 4px solid #00897B;
-        }
-        .latest-card h3 { font-size: 14px; color: #666; margin-bottom: 12px; }
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-        }
-        .data-item {
-            text-align: center;
-            padding: 12px 8px;
-            background: #f8f9fa;
-            border-radius: 12px;
-        }
-        .data-item .label { font-size: 11px; color: #888; margin-bottom: 4px; }
-        .data-item .value { font-size: 22px; font-weight: 700; }
-        .data-item .unit { font-size: 12px; color: #888; }
-        .temp-value { color: #E57373; }
-        .hum-value { color: #42A5F5; }
-        .bat-value { color: #66BB6A; }
-        .temp-value.cold { color: #42A5F5; }
-        .temp-value.hot { color: #EF5350; }
-        .raw-data {
-            margin-top: 12px;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 8px;
-            font-family: "SF Mono", Monaco, monospace;
-            font-size: 12px;
-            color: #555;
-            word-break: break-all;
-        }
-        .raw-data .parse-detail {
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px dashed #ddd;
-            font-size: 11px;
-            line-height: 1.6;
-            color: #777;
-        }
-        .device-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-            transition: transform 0.2s;
-        }
-        .device-card:active { transform: scale(0.98); }
-        .device-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .device-name { font-size: 15px; font-weight: 600; color: #333; }
-        .device-rssi {
-            font-size: 12px;
-            color: #888;
-            background: #f0f0f0;
-            padding: 2px 8px;
-            border-radius: 10px;
-        }
-        .device-mac { font-size: 12px; color: #999; margin-bottom: 10px; font-family: monospace; }
-        .device-values {
-            display: flex;
-            justify-content: space-around;
-            padding: 8px 0;
-            border-top: 1px solid #f0f0f0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .device-value { text-align: center; }
-        .device-value .v-label { font-size: 11px; color: #888; }
-        .device-value .v-num { font-size: 16px; font-weight: 700; }
-        .device-raw { margin-top: 8px; font-size: 11px; color: #aaa; font-family: monospace; }
-        .history-item {
-            background: white;
-            border-radius: 12px;
-            padding: 14px;
-            margin-bottom: 10px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-        }
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-        .history-time { font-size: 12px; color: #888; }
-        .history-device { font-size: 12px; color: #00897B; font-weight: 500; }
-        .history-values {
-            display: flex;
-            justify-content: space-around;
-            padding: 8px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        .history-raw { margin-top: 6px; font-size: 11px; color: #bbb; font-family: monospace; }
-        .chart-card {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-        .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-        .metric-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        .metric-btn {
-            padding: 8px 16px;
-            border: 1px solid #e0e0e0;
-            border-radius: 20px;
-            background: white;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .metric-btn.active {
-            background: #00897B;
-            color: white;
-            border-color: #00897B;
-        }
-        #chartCanvas {
+        button {
             width: 100%;
-            height: 250px;
-            display: block;
-            background: #fafafa;
-            border-radius: 8px;
-        }
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-top: 16px;
-        }
-        .stat-box {
-            text-align: center;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 10px;
-        }
-        .stat-box .s-label { font-size: 11px; color: #888; }
-        .stat-box .s-value { font-size: 18px; font-weight: 700; margin-top: 4px; }
-        .setting-card {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-        .setting-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-        .protocol-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
-            font-size: 13px;
-        }
-        .protocol-row:last-child { border-bottom: none; }
-        .protocol-row .p-label { color: #666; }
-        .protocol-row .p-value { color: #333; font-weight: 500; font-family: monospace; }
-        .example-box {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 12px;
-            font-size: 13px;
-        }
-        .example-box code {
-            font-family: monospace;
-            background: #e8e8e8;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-        .action-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            padding: 12px 16px;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            gap: 12px;
-            z-index: 100;
-        }
-        .action-btn {
-            flex: 1;
-            padding: 12px;
+            padding: 14px;
+            background: #007aff;
+            color: white;
             border: none;
-            border-radius: 10px;
-            font-size: 14px;
+            border-radius: 30px;
+            font-size: 18px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background 0.2s;
+            margin-top: 10px;
         }
-        .action-btn.primary { background: #00897B; color: white; }
-        .action-btn.danger { background: #E57373; color: white; }
-        .action-btn.secondary { background: #f0f0f0; color: #333; }
-        .action-btn:active { transform: scale(0.97); opacity: 0.9; }
-        .empty-state {
+        button:hover {
+            background: #005bb5;
+        }
+        button:disabled {
+            background: #a0b8cc;
+            cursor: not-allowed;
+        }
+        .status {
             text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-        .toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: #333;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 24px;
+            color: #5a6c7d;
             font-size: 14px;
-            z-index: 1000;
-            opacity: 0;
-            transition: all 0.3s;
-            pointer-events: none;
-            white-space: nowrap;
+            margin-top: 12px;
         }
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
+        .raw {
+            word-break: break-all;
+            background: #f0f2f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-top: 8px;
         }
-        .filter-bar {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-        }
-        .filter-chip {
-            padding: 6px 14px;
-            border: 1px solid #e0e0e0;
-            border-radius: 16px;
-            background: white;
-            font-size: 12px;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
-        .filter-chip.active {
-            background: #00897B;
-            color: white;
-            border-color: #00897B;
-        }
-        ::-webkit-scrollbar { display: none; }
-        @media (max-width: 360px) {
-            .data-grid { gap: 8px; }
-            .data-item .value { font-size: 18px; }
-            .filter-area input[type="number"] { width: 60px; }
-            .filter-area input[type="text"] { width: 90px; }
+        .note {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin-top: 12px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🔷 iBeacon 温湿度扫描器</h1>
-        <div class="subtitle">RL_HT_Tag 6字节广播专用</div>
-    </div>
-    <div class="tab-bar">
-        <button class="tab-btn active" data-tab="scan" onclick="switchTab('scan')">扫描</button>
-        <button class="tab-btn" data-tab="history" onclick="switchTab('history')">记录 <span class="badge" id="historyBadge" style="display:none">0</span></button>
-        <button class="tab-btn" data-tab="chart" onclick="switchTab('chart')">图表</button>
-        <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">设置</button>
-    </div>
 
-    <!-- ===== SCAN TAB ===== -->
-    <div class="tab-content active" id="tab-scan">
-        <div class="scan-control">
-            <button class="scan-btn start" id="scanBtn" onclick="toggleScan()">
-                <span id="scanBtnText">开始扫描</span>
-            </button>
-            <div class="scan-status" id="scanStatus">点击按钮连接蓝牙设备</div>
-            <div class="toggle-row">
-                <label class="toggle-switch">
-                    <input type="checkbox" id="autoRecord" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-                <span class="toggle-label">自动记录数据</span>
-            </div>
-        </div>
+    <h1>🌡️ RL_HT_Tag 温湿度</h1>
 
-        <!-- 筛选区域（仅界面保留，逻辑已禁用） -->
-        <div class="filter-area">
-            <label>📶 RSSI ≥
-                <input type="number" id="filterRSSI" value="-100" step="1" min="-120" max="0">
-                dBm
-            </label>
-            <label>🔍 MAC包含
-                <input type="text" id="filterMAC" placeholder="例如 AB:CD" style="width:120px;">
-            </label>
-            <button class="filter-btn" onclick="applyFilter()">应用筛选</button>
-            <span class="filter-hint" id="filterCount">已显示 0 台</span>
+    <div class="card">
+        <div class="info-row">
+            <span class="label">设备状态</span>
+            <span class="value" id="statusText">未连接</span>
         </div>
-
-        <div id="latestData" style="display:none">
-            <div class="latest-card">
-                <h3>📡 最新采集数据</h3>
-                <div class="data-grid">
-                    <div class="data-item">
-                        <div class="label">温度</div>
-                        <div class="value temp-value" id="latestTemp">--</div>
-                        <div class="unit">°C</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="label">湿度</div>
-                        <div class="value hum-value" id="latestHum">--</div>
-                        <div class="unit">%</div>
-                    </div>
-                    <div class="data-item">
-                        <div class="label">电量</div>
-                        <div class="value bat-value" id="latestBat">--</div>
-                        <div class="unit">%</div>
-                    </div>
-                </div>
-                <div class="raw-data">
-                    <div>原始广播数据: <span id="latestRaw">--</span></div>
-                    <div class="parse-detail" id="parseDetail"></div>
-                </div>
-                <div style="margin-top:8px;font-size:12px;color:#888;text-align:right" id="latestTime"></div>
-            </div>
+        <div class="info-row">
+            <span class="label">🌡️ 温度</span>
+            <span class="value temp" id="temperature">-- ℃</span>
         </div>
-        <div id="deviceList"></div>
-    </div>
-
-    <!-- ===== HISTORY TAB ===== -->
-    <div class="tab-content" id="tab-history">
-        <div class="filter-bar" id="deviceFilter">
-            <button class="filter-chip active" onclick="filterHistory('all')">全部</button>
+        <div class="info-row">
+            <span class="label">💧 湿度</span>
+            <span class="value humid" id="humidity">-- %</span>
         </div>
-        <div id="historyList">
-            <div class="empty-state">
-                <div class="icon">📋</div>
-                <div>暂无采集记录</div>
-                <div style="font-size:13px;margin-top:8px">连接设备后自动保存至本地</div>
-            </div>
+        <div class="info-row">
+            <span class="label">📶 信号强度 (RSSI)</span>
+            <span class="value" id="rssi">-- dBm</span>
+        </div>
+        <div class="info-row" style="flex-direction:column; align-items:stretch;">
+            <span class="label">📋 原始广播数据 (Service Data 0x0318)</span>
+            <div class="raw" id="rawData">等待数据…</div>
         </div>
     </div>
 
-    <!-- ===== CHART TAB ===== -->
-    <div class="tab-content" id="tab-chart">
-        <div class="chart-card">
-            <div class="chart-title">📊 数据趋势曲线</div>
-            <div class="metric-tabs">
-                <button class="metric-btn active" onclick="setChartMetric('temp',this)">温度</button>
-                <button class="metric-btn" onclick="setChartMetric('hum',this)">湿度</button>
-                <button class="metric-btn" onclick="setChartMetric('bat',this)">电量</button>
-            </div>
-            <canvas id="chartCanvas"></canvas>
-            <div class="stats-row" id="statsRow">
-                <div class="stat-box">
-                    <div class="s-label">最小值</div>
-                    <div class="s-value" id="statMin">--</div>
-                </div>
-                <div class="stat-box">
-                    <div class="s-label">最大值</div>
-                    <div class="s-value" id="statMax">--</div>
-                </div>
-                <div class="stat-box">
-                    <div class="s-label">平均值</div>
-                    <div class="s-value" id="statAvg">--</div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <button id="connectBtn">🔗 连接并读取</button>
+    <div class="status" id="statusDetail">点击按钮开始扫描设备</div>
+    <div class="note">* 需要 Chrome 80+ 且支持 Web Bluetooth，页面需在 HTTPS 或 localhost 下运行。</div>
 
-    <!-- ===== SETTINGS TAB ===== -->
-    <div class="tab-content" id="tab-settings">
-        <div class="setting-card">
-            <div class="setting-title">📋 设备数据协议说明</div>
-            <div class="protocol-row">
-                <span class="p-label">Service UUID</span>
-                <span class="p-value">00000318-0000-1000-8000-00805f9b34fb</span>
-            </div>
-            <div class="protocol-row"><span class="p-label">有效数据长度</span><span class="p-value">6 Bytes</span></div>
-            <div class="protocol-row"><span class="p-label">Byte0</span><span class="p-value">温度符号 00=正 / 01=负</span></div>
-            <div class="protocol-row"><span class="p-label">Byte1</span><span class="p-value">温度整数(16进制)</span></div>
-            <div class="protocol-row"><span class="p-label">Byte2</span><span class="p-value">温度小数 ÷100</span></div>
-            <div class="protocol-row"><span class="p-label">Byte3</span><span class="p-value">湿度整数(16进制)</span></div>
-            <div class="protocol-row"><span class="p-label">Byte4</span><span class="p-value">湿度小数 ÷100</span></div>
-            <div class="protocol-row"><span class="p-label">Byte5</span><span class="p-value">电池电量 %</span></div>
-            <div class="example-box">
-                <strong>解析示例：</strong><br>
-                原始广播：<code>0x001A45322A64</code><br>
-                符号：正(00) | 温度=26 + 69/100 = 26.69℃<br>
-                湿度=50 + 42/100 = 50.42% | 电量=100%
-            </div>
-        </div>
-        <div class="setting-card">
-            <div class="setting-title">⚙️ 数据操作</div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <button class="action-btn secondary" onclick="exportCSV()">📤 导出CSV记录</button>
-                <button class="action-btn danger" onclick="clearAllData()">🗑️ 清空全部本地记录</button>
-            </div>
-        </div>
-        <div class="setting-card">
-            <div class="setting-title">ℹ️ 使用说明</div>
-            <p style="font-size:13px;color:#666;line-height:1.6">
-                1. 仅支持 Android Chrome 浏览器，必须 HTTPS 访问<br>
-                2. 手机开启蓝牙+定位，授予全部权限<br>
-                3. 单次仅可连接一台 RL_HT_Tag 设备<br>
-                4. 断开后自动重试重连，超出范围恢复后自动采集<br>
-                5. 数据存储在浏览器本地，清空缓存会丢失记录
-            </p>
-        </div>
-    </div>
+    <script>
+        (function() {
+            // DOM 元素
+            const connectBtn = document.getElementById('connectBtn');
+            const statusText = document.getElementById('statusText');
+            const statusDetail = document.getElementById('statusDetail');
+            const tempSpan = document.getElementById('temperature');
+            const humSpan = document.getElementById('humidity');
+            const rssiSpan = document.getElementById('rssi');
+            const rawSpan = document.getElementById('rawData');
 
-    <div class="toast" id="toast"></div>
+            let device = null;
+            let watching = false;
 
-<script>
-// ============================================================
-//  全局配置
-// ============================================================
-const MAX_RECORD_COUNT = 1200;
-const DEVICE_OFFLINE_MS = 25000;
-const RECONNECT_DELAY = 2800;
-const CLEAN_DEV_INTERVAL = 4000;
-const CHART_RESIZE_DELAY = 300;
-const SERVICE_UUID = "00000318-0000-1000-8000-00805f9b34fb";
-
-// ============================================================
-//  全局状态
-// ============================================================
-let isScanning = false;
-let isManualDisconnect = false;
-let bluetoothDevice = null;
-let disconnectHandler = null;
-let scanTimer = null;
-let reconnectTimer = null;
-let records = JSON.parse(localStorage.getItem('ibeacon_records') || '[]');
-let currentDevices = new Map();
-let chartMetric = 'temp';
-let currentFilter = 'all';
-let resizeTimer = null;
-
-// 筛选变量（保留但不再用于过滤）
-let filterRSSI = -100;
-let filterMAC = '';
-
-const autoRecordCheckbox = document.getElementById('autoRecord');
-autoRecordCheckbox.checked = localStorage.getItem('autoRecord') !== 'false';
-autoRecordCheckbox.addEventListener('change', e => {
-    localStorage.setItem('autoRecord', e.target.checked);
-});
-
-// ============================================================
-//  Tab 切换
-// ============================================================
-function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-    document.getElementById(`tab-${tab}`).classList.add('active');
-    if (tab === 'history') renderHistory();
-    if (tab === 'chart') renderChart();
-}
-
-function showToast(msg) {
-    const toast = document.getElementById('toast');
-    toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2200);
-}
-
-// ============================================================
-//  核心解析器
-// ============================================================
-function parseServiceData(rawHex) {
-    if (!rawHex) return null;
-    let hex = rawHex.replace(/0x|\s|\r|\n/g, '').toUpperCase();
-    if (hex.length < 12 || hex.length % 2 !== 0) return null;
-    hex = hex.slice(0, 12);
-    const bytes = [];
-    for (let i = 0; i < hex.length; i += 2) {
-        const val = parseInt(hex.substr(i, 2), 16);
-        if (isNaN(val)) return null;
-        bytes.push(val);
-    }
-    if (bytes.length < 6) return null;
-    const signByte = bytes[0];
-    const tempInt = bytes[1];
-    const tempFrac = bytes[2];
-    const humInt = bytes[3];
-    const humFrac = bytes[4];
-    let battery = bytes[5];
-    if (battery > 100) battery = 100;
-
-    const isNegative = signByte === 0x01;
-    const sign = isNegative ? -1 : 1;
-    const temperature = sign * (tempInt + tempFrac / 100);
-    const humidity = humInt + humFrac / 100;
-
-    return {
-        temperature: temperature.toFixed(2),
-        humidity: humidity.toFixed(2),
-        battery: battery,
-        isNegative: isNegative,
-        rawHex: `0x${hex}`,
-        parseDetail: `符号:${isNegative?'负':'正'} | 温:${tempInt.toString(16).padStart(2,'0')}.${tempFrac.toString(16).padStart(2,'0')} | 湿:${humInt.toString(16).padStart(2,'0')}.${humFrac.toString(16).padStart(2,'0')} | 电量:${battery.toString(16).padStart(2,'0')}`
-    };
-}
-
-// ============================================================
-//  筛选逻辑（完全禁用 - 始终返回 true）
-// ============================================================
-function isDeviceFiltered(record) {
-    // 始终通过，不做任何过滤
-    return true;
-}
-
-function applyFilter() {
-    // 读取输入值（仅用于界面显示，不实际过滤）
-    const rssiInput = document.getElementById('filterRSSI');
-    const macInput = document.getElementById('filterMAC');
-    filterRSSI = parseInt(rssiInput.value, 10);
-    if (isNaN(filterRSSI)) filterRSSI = -100;
-    filterMAC = macInput.value.trim();
-
-    // 不删除任何设备，仅更新计数
-    document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
-    showToast(`当前显示 ${currentDevices.size} 台设备（筛选已禁用）`);
-}
-
-// 监听输入框回车
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('filterRSSI').addEventListener('keypress', e => { if (e.key === 'Enter') applyFilter(); });
-    document.getElementById('filterMAC').addEventListener('keypress', e => { if (e.key === 'Enter') applyFilter(); });
-});
-
-// ============================================================
-//  BLE 扫描与重连
-// ============================================================
-async function toggleScan() {
-    if (isScanning) await stopScan();
-    else await startScan();
-}
-
-async function startScan() {
-    if (window.location.protocol !== 'https:' && window.location.protocol !== 'http://localhost') {
-        showToast('仅HTTPS/localhost可用');
-        return;
-    }
-    if (!navigator.bluetooth) {
-        showToast('浏览器不支持WebBluetooth，请使用Android Chrome');
-        return;
-    }
-    if (isScanning) return;
-
-    try {
-        showToast('请在弹窗选择RL_HT_Tag设备');
-        const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: [SERVICE_UUID]
-        });
-        bluetoothDevice = device;
-        isManualDisconnect = false;
-
-        if (disconnectHandler) {
-            device.removeEventListener('gattserverdisconnected', disconnectHandler);
-            disconnectHandler = null;
-        }
-        disconnectHandler = async () => {
-            if (isManualDisconnect) return;
-            showToast('设备断开，等待自动重连...');
-            isScanning = false;
-            updateScanUI();
-            clearTimeout(reconnectTimer);
-            reconnectTimer = setTimeout(async () => {
-                if (!isScanning && !isManualDisconnect) {
-                    await startScan();
+            // 解析温度：字节0符号(00正/01负)，字节1整数，字节2小数(两位)
+            function parseTemperature(hexString) {
+                // 去掉可能的前缀 "0x"
+                const clean = hexString.replace(/^0x/, '');
+                // 确保长度为偶数
+                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
+                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
+                if (bytes.length < 3) {
+                    throw new Error('数据长度不足，至少需要3字节');
                 }
-            }, RECONNECT_DELAY);
-        };
-        device.addEventListener('gattserverdisconnected', disconnectHandler);
+                const sign = bytes[0] === 0x00 ? 1 : -1;
+                const integer = bytes[1];
+                const fraction = bytes[2];          // 例如 0x45 = 69
+                // 假设小数部分为两位（0~99），实际值 = 整数 + fraction/100
+                const temp = sign * (integer + fraction / 100);
+                return temp;
+            }
 
-        const server = await device.gatt.connect();
-        isScanning = true;
-        updateScanUI();
-        showToast(`连接成功：${device.name || '未知iBeacon温湿度标签'}`);
+            // 尝试解析湿度（根据常见传感器，可能后3字节类似，但未提供规则，此处仅作占位）
+            // 这里我们尝试用后两字节（索引3,4）作为整数+小数，单位%，若数据不足则返回 null
+            function parseHumidity(hexString) {
+                const clean = hexString.replace(/^0x/, '');
+                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
+                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
+                if (bytes.length >= 5) {
+                    // 假设湿度: 字节3为整数，字节4为小数（两位）
+                    const intPart = bytes[3];
+                    const fracPart = bytes[4];
+                    // 有些传感器湿度整数+小数，范围0~100
+                    const humidity = intPart + fracPart / 100;
+                    // 合理性检查（0~100）
+                    if (humidity >= 0 && humidity <= 100) {
+                        return humidity;
+                    }
+                }
+                return null; // 无法解析
+            }
 
-        if (device.watchAdvertisements) {
-            await device.watchAdvertisements();
-            device.addEventListener('advertisementreceived', handleAdvertisement);
-        }
-        await readGattNotify(server);
-        startDeviceCleanTimer();
+            // 更新界面
+            function updateDisplay(temp, humidity, rssi, rawHex) {
+                if (temp !== undefined && temp !== null) {
+                    tempSpan.textContent = temp.toFixed(2) + ' ℃';
+                } else {
+                    tempSpan.textContent = '-- ℃';
+                }
+                if (humidity !== undefined && humidity !== null) {
+                    humSpan.textContent = humidity.toFixed(1) + ' %';
+                } else {
+                    humSpan.textContent = '-- %';
+                }
+                if (rssi !== undefined && rssi !== null) {
+                    rssiSpan.textContent = rssi + ' dBm';
+                } else {
+                    rssiSpan.textContent = '-- dBm';
+                }
+                if (rawHex) {
+                    rawSpan.textContent = '0x' + rawHex.toUpperCase();
+                } else {
+                    rawSpan.textContent = '无数据';
+                }
+            }
 
-    } catch (err) {
-        console.error('扫描启动失败', err);
-        isScanning = false;
-        updateScanUI();
-        if (err.name === 'NotFoundError') showToast('未选择蓝牙设备');
-        else if (err.name === 'SecurityError') showToast('请开启蓝牙、定位并授予权限');
-        else showToast(`连接失败：${err.message.slice(0,25)}`);
-    }
-}
+            // 处理接收到的广告数据
+            function handleAdvertisement(event) {
+                const adv = event;
+                const serviceData = adv.serviceData;
+                if (!serviceData) {
+                    statusDetail.textContent = '未包含 Service Data';
+                    return;
+                }
+                // 查找 UUID 0x0318
+                const uuid = '00000318-0000-1000-8000-00805f9b34fb';
+                let dataView = null;
+                for (const [key, value] of serviceData) {
+                    if (key === uuid) {
+                        dataView = value;
+                        break;
+                    }
+                }
+                if (!dataView) {
+                    // 尝试用短 UUID 0x0318
+                    const shortUuid = '0318';
+                    for (const [key, value] of serviceData) {
+                        if (key.includes(shortUuid)) {
+                            dataView = value;
+                            break;
+                        }
+                    }
+                }
+                if (!dataView) {
+                    statusDetail.textContent = '未找到 Service Data (0x0318)';
+                    rawSpan.textContent = '无匹配数据';
+                    return;
+                }
 
-async function readGattNotify(server) {
-    try {
-        const services = await server.getPrimaryServices();
-        for (const srv of services) {
-            if (!srv.uuid.includes('0318')) continue;
-            const chars = await srv.getCharacteristics();
-            for (const ch of chars) {
-                if (ch.properties.notify) {
-                    await ch.startNotifications();
-                    ch.addEventListener('characteristicvaluechanged', ev => {
-                        const buf = ev.target.value;
-                        const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-                        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-                        handleData(hex, bluetoothDevice?.name || 'RL_HT_Tag', bluetoothDevice?.id || 'unknown');
+                // 转为十六进制字符串
+                const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+                let hex = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    hex += bytes[i].toString(16).padStart(2, '0');
+                }
+                rawSpan.textContent = '0x' + hex.toUpperCase();
+
+                // 解析温度
+                let temp = null;
+                let humid = null;
+                try {
+                    temp = parseTemperature(hex);
+                } catch (e) {
+                    statusDetail.textContent = '温度解析失败: ' + e.message;
+                }
+                // 尝试解析湿度（占位规则）
+                try {
+                    humid = parseHumidity(hex);
+                } catch (e) {
+                    // 忽略
+                }
+
+                // RSSI
+                const rssi = adv.rssi;
+
+                // 更新显示
+                updateDisplay(temp, humid, rssi, hex);
+                statusText.textContent = '已连接，接收数据';
+                statusDetail.textContent = '最新数据更新于 ' + new Date().toLocaleTimeString();
+            }
+
+            // 连接并开始监听广播
+            async function connectAndRead() {
+                if (watching) {
+                    // 如果已经连接，则断开
+                    try {
+                        if (device && device.gatt) {
+                            await device.gatt.disconnect();
+                        }
+                    } catch (e) {}
+                    watching = false;
+                    device = null;
+                    statusText.textContent = '已断开';
+                    statusDetail.textContent = '点击按钮重新连接';
+                    connectBtn.textContent = '🔗 连接并读取';
+                    updateDisplay(null, null, null, null);
+                    return;
+                }
+
+                try {
+                    connectBtn.disabled = true;
+                    statusDetail.textContent = '正在扫描设备…';
+                    // 请求设备（根据设备名称过滤）
+                    device = await navigator.bluetooth.requestDevice({
+                        filters: [{ name: 'RL_HT_Tag' }],
+                        optionalServices: []  // 不需要额外服务，watch 广告即可
                     });
+
+                    statusDetail.textContent = '正在连接 GATT…';
+                    // 连接 GATT（watchAdvertisements 需要连接状态）
+                    const server = await device.gatt.connect();
+                    statusText.textContent = 'GATT 已连接';
+
+                    // 检查是否支持 watchAdvertisements
+                    if (!device.watchAdvertisements) {
+                        throw new Error('当前浏览器不支持 watchAdvertisements，请使用最新 Chrome 并启用实验性 Web Bluetooth 功能。');
+                    }
+
+                    statusDetail.textContent = '正在开启广播监听…';
+                    await device.watchAdvertisements();
+
+                    // 监听广告事件
+                    device.addEventListener('advertisementreceived', handleAdvertisement);
+
+                    watching = true;
+                    connectBtn.textContent = '🔌 断开连接';
+                    statusDetail.textContent = '已开始监听广播数据，等待设备发送…';
+                    // 如果立即有数据，会触发事件
+                    // 同时尝试主动读取一次（可选）
+                    // 部分设备可能不会持续广播，可触发重连
+
+                } catch (error) {
+                    console.error(error);
+                    statusText.textContent = '错误';
+                    statusDetail.textContent = '❌ ' + error.message;
+                    // 重置状态
+                    if (device) {
+                        try { device.gatt.disconnect(); } catch (e) {}
+                        device = null;
+                    }
+                    watching = false;
+                    connectBtn.textContent = '🔗 连接并读取';
+                } finally {
+                    connectBtn.disabled = false;
                 }
             }
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RL_HT_Tag 温湿度读取器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f7f9fc;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
-    } catch (e) {
-        console.warn('GATT无可用通知特征', e);
-    }
-}
+        h1 {
+            font-size: 24px;
+            color: #1a3b5d;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            color: #5a6c7d;
+            font-weight: 500;
+        }
+        .value {
+            font-weight: 600;
+            color: #0b2b44;
+        }
+        .value.temp {
+            color: #d35400;
+        }
+        .value.humid {
+            color: #2980b9;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #005bb5;
+        }
+        button:disabled {
+            background: #a0b8cc;
+            cursor: not-allowed;
+        }
+        .status {
+            text-align: center;
+            color: #5a6c7d;
+            font-size: 14px;
+            margin-top: 12px;
+        }
+        .raw {
+            word-break: break-all;
+            background: #f0f2f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .note {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin-top: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
 
-function handleAdvertisement(event) {
-    const dev = event.device;
-    const rssi = event.rssi;
-    if (!event.manufacturerData) return;
-    event.manufacturerData.forEach((buf, companyId) => {
-        const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-        handleData(hex, dev.name || 'RL_HT_Tag', dev.id, rssi);
-    });
-}
+    <h1>🌡️ RL_HT_Tag 温湿度</h1>
 
-// ===== 核心数据处理（无过滤，直接添加） =====
-function handleData(rawHex, devName, devId, rssi = null) {
-    const parsed = parseServiceData(rawHex);
-    if (!parsed) return;
-    const now = Date.now();
-    const record = {
-        id: now + Math.random(),
-        timestamp: new Date().toISOString(),
-        deviceName: devName,
-        deviceId: devId,
-        rawData: parsed.rawHex,
-        temperature: parsed.temperature,
-        humidity: parsed.humidity,
-        battery: parsed.battery,
-        isNegative: parsed.isNegative,
-        rssi: rssi,
-        parseDetail: parsed.parseDetail
-    };
+    <div class="card">
+        <div class="info-row">
+            <span class="label">设备状态</span>
+            <span class="value" id="statusText">未连接</span>
+        </div>
+        <div class="info-row">
+            <span class="label">🌡️ 温度</span>
+            <span class="value temp" id="temperature">-- ℃</span>
+        </div>
+        <div class="info-row">
+            <span class="label">💧 湿度</span>
+            <span class="value humid" id="humidity">-- %</span>
+        </div>
+        <div class="info-row">
+            <span class="label">📶 信号强度 (RSSI)</span>
+            <span class="value" id="rssi">-- dBm</span>
+        </div>
+        <div class="info-row" style="flex-direction:column; align-items:stretch;">
+            <span class="label">📋 原始广播数据 (Service Data 0x0318)</span>
+            <div class="raw" id="rawData">等待数据…</div>
+        </div>
+    </div>
 
-    // 无条件添加或更新设备
-    currentDevices.set(devId, { record, lastUpdateTs: now });
-    renderDeviceList();
-    updateLatestData(record);
-    if (autoRecordCheckbox.checked) {
-        records.unshift(record);
-        if (records.length > MAX_RECORD_COUNT) records.pop();
-        localStorage.setItem('ibeacon_records', JSON.stringify(records));
-        updateBadge();
-    }
-    document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
-}
+    <button id="connectBtn">🔗 连接并读取</button>
+    <div class="status" id="statusDetail">点击按钮开始扫描设备</div>
+    <div class="note">* 需要 Chrome 80+ 且支持 Web Bluetooth，页面需在 HTTPS 或 localhost 下运行。</div>
 
-function startDeviceCleanTimer() {
-    if (scanTimer) clearInterval(scanTimer);
-    scanTimer = setInterval(() => {
-        const now = Date.now();
-        let needRender = false;
-        for (const [did, item] of currentDevices) {
-            if (now - item.lastUpdateTs > DEVICE_OFFLINE_MS) {
-                currentDevices.delete(did);
-                needRender = true;
+    <script>
+        (function() {
+            // DOM 元素
+            const connectBtn = document.getElementById('connectBtn');
+            const statusText = document.getElementById('statusText');
+            const statusDetail = document.getElementById('statusDetail');
+            const tempSpan = document.getElementById('temperature');
+            const humSpan = document.getElementById('humidity');
+            const rssiSpan = document.getElementById('rssi');
+            const rawSpan = document.getElementById('rawData');
+
+            let device = null;
+            let watching = false;
+
+            // 解析温度：字节0符号(00正/01负)，字节1整数，字节2小数(两位)
+            function parseTemperature(hexString) {
+                // 去掉可能的前缀 "0x"
+                const clean = hexString.replace(/^0x/, '');
+                // 确保长度为偶数
+                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
+                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
+                if (bytes.length < 3) {
+                    throw new Error('数据长度不足，至少需要3字节');
+                }
+                const sign = bytes[0] === 0x00 ? 1 : -1;
+                const integer = bytes[1];
+                const fraction = bytes[2];          // 例如 0x45 = 69
+                // 假设小数部分为两位（0~99），实际值 = 整数 + fraction/100
+                const temp = sign * (integer + fraction / 100);
+                return temp;
             }
-        }
-        if (needRender) {
-            renderDeviceList();
-            if (currentDevices.size === 0) {
-                document.getElementById('latestData').style.display = 'none';
+
+            // 尝试解析湿度（根据常见传感器，可能后3字节类似，但未提供规则，此处仅作占位）
+            // 这里我们尝试用后两字节（索引3,4）作为整数+小数，单位%，若数据不足则返回 null
+            function parseHumidity(hexString) {
+                const clean = hexString.replace(/^0x/, '');
+                const padded = clean.length % 2 === 0 ? clean : '0' + clean;
+                const bytes = padded.match(/.{1,2}/g).map(b => parseInt(b, 16));
+                if (bytes.length >= 5) {
+                    // 假设湿度: 字节3为整数，字节4为小数（两位）
+                    const intPart = bytes[3];
+                    const fracPart = bytes[4];
+                    // 有些传感器湿度整数+小数，范围0~100
+                    const humidity = intPart + fracPart / 100;
+                    // 合理性检查（0~100）
+                    if (humidity >= 0 && humidity <= 100) {
+                        return humidity;
+                    }
+                }
+                return null; // 无法解析
             }
-            document.getElementById('filterCount').textContent = `已显示 ${currentDevices.size} 台`;
-        }
-    }, CLEAN_DEV_INTERVAL);
-}
 
-async function stopScan() {
-    isManualDisconnect = true;
-    isScanning = false;
-    clearInterval(scanTimer);
-    clearTimeout(reconnectTimer);
-    scanTimer = null;
-    reconnectTimer = null;
-    if (bluetoothDevice && bluetoothDevice.gatt.connected) {
-        bluetoothDevice.gatt.disconnect();
-    }
-    if (bluetoothDevice && disconnectHandler) {
-        bluetoothDevice.removeEventListener('gattserverdisconnected', disconnectHandler);
-        disconnectHandler = null;
-    }
-    updateScanUI();
-    showToast('已停止蓝牙扫描采集');
-    setTimeout(() => { isManualDisconnect = false; }, 500);
-}
+            // 更新界面
+            function updateDisplay(temp, humidity, rssi, rawHex) {
+                if (temp !== undefined && temp !== null) {
+                    tempSpan.textContent = temp.toFixed(2) + ' ℃';
+                } else {
+                    tempSpan.textContent = '-- ℃';
+                }
+                if (humidity !== undefined && humidity !== null) {
+                    humSpan.textContent = humidity.toFixed(1) + ' %';
+                } else {
+                    humSpan.textContent = '-- %';
+                }
+                if (rssi !== undefined && rssi !== null) {
+                    rssiSpan.textContent = rssi + ' dBm';
+                } else {
+                    rssiSpan.textContent = '-- dBm';
+                }
+                if (rawHex) {
+                    rawSpan.textContent = '0x' + rawHex.toUpperCase();
+                } else {
+                    rawSpan.textContent = '无数据';
+                }
+            }
 
-function updateScanUI() {
-    const btn = document.getElementById('scanBtn');
-    const text = document.getElementById('scanBtnText');
-    const status = document.getElementById('scanStatus');
-    if (isScanning) {
-        btn.classList.remove('start');
-        btn.classList.add('stop', 'scanning');
-        text.textContent = '停止';
-        status.textContent = '持续采集广播数据中...';
-        status.classList.add('scanning');
-    } else {
-        btn.classList.remove('stop', 'scanning');
-        btn.classList.add('start');
-        text.textContent = '开始扫描';
-        status.textContent = '点击按钮连接蓝牙设备';
-        status.classList.remove('scanning');
-    }
-}
+            // 处理接收到的广告数据
+            function handleAdvertisement(event) {
+                const adv = event;
+                const serviceData = adv.serviceData;
+                if (!serviceData) {
+                    statusDetail.textContent = '未包含 Service Data';
+                    return;
+                }
+                // 查找 UUID 0x0318
+                const uuid = '00000318-0000-1000-8000-00805f9b34fb';
+                let dataView = null;
+                for (const [key, value] of serviceData) {
+                    if (key === uuid) {
+                        dataView = value;
+                        break;
+                    }
+                }
+                if (!dataView) {
+                    // 尝试用短 UUID 0x0318
+                    const shortUuid = '0318';
+                    for (const [key, value] of serviceData) {
+                        if (key.includes(shortUuid)) {
+                            dataView = value;
+                            break;
+                        }
+                    }
+                }
+                if (!dataView) {
+                    statusDetail.textContent = '未找到 Service Data (0x0318)';
+                    rawSpan.textContent = '无匹配数据';
+                    return;
+                }
 
-// ============================================================
-//  UI 渲染
-// ============================================================
-function updateLatestData(record) {
-    document.getElementById('latestData').style.display = 'block';
-    document.getElementById('latestTemp').textContent = record.temperature;
-    document.getElementById('latestHum').textContent = record.humidity;
-    document.getElementById('latestBat').textContent = record.battery;
-    document.getElementById('latestRaw').textContent = record.rawData;
-    document.getElementById('parseDetail').textContent = record.parseDetail;
-    document.getElementById('latestTime').textContent = formatTime(record.timestamp);
-    const tempNum = parseFloat(record.temperature);
-    const tempEl = document.getElementById('latestTemp');
-    tempEl.classList.remove('cold', 'hot');
-    if (tempNum < 10) tempEl.classList.add('cold');
-    else if (tempNum > 35) tempEl.classList.add('hot');
-}
+                // 转为十六进制字符串
+                const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+                let hex = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    hex += bytes[i].toString(16).padStart(2, '0');
+                }
+                rawSpan.textContent = '0x' + hex.toUpperCase();
 
-function renderDeviceList() {
-    const wrap = document.getElementById('deviceList');
-    if (currentDevices.size === 0) {
-        wrap.innerHTML = '';
-        return;
-    }
-    let html = '<div style="margin:8px 0;font-size:14px;font-weight:600;color:#666">在线设备列表</div>';
-    currentDevices.forEach(item => {
-        const d = item.record;
-        html += `
-        <div class="device-card">
-            <div class="device-header">
-                <span class="device-name">${escapeHtml(d.deviceName)}</span>
-                <span class="device-rssi">${d.rssi ? d.rssi + ' dBm' : '无信号'}</span>
-            </div>
-            <div class="device-mac">${escapeHtml(d.deviceId)}</div>
-            <div class="device-values">
-                <div class="device-value">
-                    <div class="v-label">温度</div>
-                    <div class="v-num" style="color:#E57373">${d.temperature}°C</div>
-                </div>
-                <div class="device-value">
-                    <div class="v-label">湿度</div>
-                    <div class="v-num" style="color:#42A5F5">${d.humidity}%</div>
-                </div>
-                <div class="device-value">
-                    <div class="v-label">电量</div>
-                    <div class="v-num" style="color:#66BB6A">${d.battery}%</div>
-                </div>
-            </div>
-            <div class="device-raw">${d.rawData} | ${d.parseDetail}</div>
-        </div>`;
-    });
-    wrap.innerHTML = html;
-}
+                // 解析温度
+                let temp = null;
+                let humid = null;
+                try {
+                    temp = parseTemperature(hex);
+                } catch (e) {
+                    statusDetail.textContent = '温度解析失败: ' + e.message;
+                }
+                // 尝试解析湿度（占位规则）
+                try {
+                    humid = parseHumidity(hex);
+                } catch (e) {
+                    // 忽略
+                }
 
-// ============================================================
-//  历史记录
-// ============================================================
-function renderHistory() {
-    const wrap = document.getElementById('historyList');
-    updateBadge();
-    updateFilterChips();
-    let list = records;
-    if (currentFilter !== 'all') list = records.filter(r => r.deviceId === currentFilter);
-    if (list.length === 0) {
-        wrap.innerHTML = `<div class="empty-state"><div class="icon">📋</div><div>暂无采集记录</div><div style="font-size:13px;margin-top:8px">连接设备后自动保存数据</div></div>`;
-        return;
-    }
-    let html = '';
-    list.forEach(r => {
-        html += `
-        <div class="history-item">
-            <div class="history-header">
-                <span class="history-time">${formatTime(r.timestamp)}</span>
-                <span class="history-device">${escapeHtml(r.deviceName)}</span>
-            </div>
-            <div class="history-values">
-                <div class="device-value">
-                    <div class="v-label">温度</div>
-                    <div class="v-num" style="color:#E57373">${r.temperature}°C</div>
-                </div>
-                <div class="device-value">
-                    <div class="v-label">湿度</div>
-                    <div class="v-num" style="color:#42A5F5">${r.humidity}%</div>
-                </div>
-                <div class="device-value">
-                    <div class="v-label">电量</div>
-                    <div class="v-num" style="color:#66BB6A">${r.battery}%</div>
-                </div>
-            </div>
-            <div class="history-raw">原始广播包：${r.rawData}</div>
-        </div>`;
-    });
-    wrap.innerHTML = html;
-}
+                // RSSI
+                const rssi = adv.rssi;
 
-function updateFilterChips() {
-    const devIds = [...new Set(records.map(r => r.deviceId))];
-    const wrap = document.getElementById('deviceFilter');
-    let html = `<button class="filter-chip ${currentFilter==='all'?'active':''}" onclick="filterHistory('all')">全部(${records.length})</button>`;
-    devIds.forEach(id => {
-        const cnt = records.filter(r => r.deviceId === id).length;
-        const name = records.find(r => r.deviceId === id)?.deviceName || '未知设备';
-        html += `<button class="filter-chip ${currentFilter===id?'active':''}" onclick="filterHistory('${id}')">${escapeHtml(name)}(${cnt})</button>`;
-    });
-    wrap.innerHTML = html;
-}
+                // 更新显示
+                updateDisplay(temp, humid, rssi, hex);
+                statusText.textContent = '已连接，接收数据';
+                statusDetail.textContent = '最新数据更新于 ' + new Date().toLocaleTimeString();
+            }
 
-function filterHistory(devId) {
-    currentFilter = devId;
-    renderHistory();
-}
+            // 连接并开始监听广播
+            async function connectAndRead() {
+                if (watching) {
+                    // 如果已经连接，则断开
+                    try {
+                        if (device && device.gatt) {
+                            await device.gatt.disconnect();
+                        }
+                    } catch (e) {}
+                    watching = false;
+                    device = null;
+                    statusText.textContent = '已断开';
+                    statusDetail.textContent = '点击按钮重新连接';
+                    connectBtn.textContent = '🔗 连接并读取';
+                    updateDisplay(null, null, null, null);
+                    return;
+                }
 
-function updateBadge() {
-    const badge = document.getElementById('historyBadge');
-    if (records.length > 0) {
-        badge.textContent = records.length;
-        badge.style.display = 'inline-block';
-    } else {
-        badge.style.display = 'none';
-    }
-}
+                try {
+                    connectBtn.disabled = true;
+                    statusDetail.textContent = '正在扫描设备…';
+                    // 请求设备（根据设备名称过滤）
+                    device = await navigator.bluetooth.requestDevice({
+                        filters: [{ name: 'RL_HT_Tag' }],
+                        optionalServices: []  // 不需要额外服务，watch 广告即可
+                    });
 
-// ============================================================
-//  图表
-// ============================================================
-function setChartMetric(metric, el) {
-    chartMetric = metric;
-    document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
-    el.classList.add('active');
-    renderChart();
-}
+                    statusDetail.textContent = '正在连接 GATT…';
+                    // 连接 GATT（watchAdvertisements 需要连接状态）
+                    const server = await device.gatt.connect();
+                    statusText.textContent = 'GATT 已连接';
 
-function renderChart() {
-    const canvas = document.getElementById('chartCanvas');
-    const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const w = rect.width || 300;
-    const h = rect.height || 250;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, w, h);
+                    // 检查是否支持 watchAdvertisements
+                    if (!device.watchAdvertisements) {
+                        throw new Error('当前浏览器不支持 watchAdvertisements，请使用最新 Chrome 并启用实验性 Web Bluetooth 功能。');
+                    }
 
-    if (records.length === 0) {
-        ctx.fillStyle = '#999';
-        ctx.font = '14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('暂无数据，扫描设备后生成趋势曲线', w / 2, h / 2);
-        return;
-    }
+                    statusDetail.textContent = '正在开启广播监听…';
+                    await device.watchAdvertisements();
 
-    const data = records.slice(0, 50).reverse();
-    const values = data.map(r => {
-        if (chartMetric === 'temp') return parseFloat(r.temperature);
-        if (chartMetric === 'hum') return parseFloat(r.humidity);
-        return r.battery;
-    });
+                    // 监听广告事件
+                    device.addEventListener('advertisementreceived', handleAdvertisement);
 
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    const unit = chartMetric === 'temp' ? '°C' : '%';
-    document.getElementById('statMin').textContent = min.toFixed(1) + unit;
-    document.getElementById('statMax').textContent = max.toFixed(1) + unit;
-    document.getElementById('statAvg').textContent = avg.toFixed(1) + unit;
+                    watching = true;
+                    connectBtn.textContent = '🔌 断开连接';
+                    statusDetail.textContent = '已开始监听广播数据，等待设备发送…';
+                    // 如果立即有数据，会触发事件
+                    // 同时尝试主动读取一次（可选）
+                    // 部分设备可能不会持续广播，可触发重连
 
-    const colorMap = { temp: '#E57373', hum: '#42A5F5', bat: '#66BB6A' };
-    const lineColor = colorMap[chartMetric];
+                } catch (error) {
+                    console.error(error);
+                    statusText.textContent = '错误';
+                    statusDetail.textContent = '❌ ' + error.message;
+                    // 重置状态
+                    if (device) {
+                        try { device.gatt.disconnect(); } catch (e) {}
+                        device = null;
+                    }
+                    watching = false;
+                    connectBtn.textContent = '🔗 连接并读取';
+                } finally {
+                    connectBtn.disabled = false;
+                }
+            }
 
-    ctx.strokeStyle = '#f0f0f0';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-        const y = 30 + (h - 60) * i / 4;
-        ctx.beginPath();
-        ctx.moveTo(40, y);
-        ctx.lineTo(w - 10, y);
-        ctx.stroke();
-    }
+            // 点击事件
+            connectBtn.addEventListener('click', connectAndRead);
 
-    if (values.length > 1) {
-        const range = max - min || 1;
-        const stepX = (w - 50) / (values.length - 1);
-        ctx.strokeStyle = lineColor;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        values.forEach((v, i) => {
-            const x = 40 + i * stepX;
-            const y = 30 + (h - 60) * (1 - (v - min) / range);
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        ctx.fillStyle = lineColor + '40';
-        ctx.lineTo(40 + (values.length - 1) * stepX, h - 30);
-        ctx.lineTo(40, h - 30);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = lineColor;
-        values.forEach((v, i) => {
-            const x = 40 + i * stepX;
-            const y = 30 + (h - 60) * (1 - (v - min) / range);
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-        });
-    }
+            // 页面关闭时清理
+            window.addEventListener('beforeunload', async () => {
+                if (device && watching) {
+                    try {
+                        await device.gatt.disconnect();
+                    } catch (e) {}
+                }
+            });
 
-    ctx.fillStyle = '#888';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    for (let i = 0; i <= 4; i++) {
-        const val = min + (max - min) * (1 - i / 4);
-        const y = 30 + (h - 60) * i / 4;
-        ctx.fillText(val.toFixed(1), 35, y + 4);
-    }
-}
+            // 初始化显示
+            updateDisplay(null, null, null, null);
 
-// ============================================================
-//  CSV 导出 & 数据清除
-// ============================================================
-function escapeCsvField(str) {
-    if (!str) return '';
-    let s = String(str);
-    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-        s = `"${s.replace(/"/g, '""')}"`;
-    }
-    return s;
-}
+            // 检查浏览器支持
+            if (!navigator.bluetooth) {
+                statusText.textContent = '不支持';
+                statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth，请使用 Chrome 80+';
+                connectBtn.disabled = true;
+            }
+        })();
+    </script>
+</body>
+</html>
+            // 点击事件
+            connectBtn.addEventListener('click', connectAndRead);
 
-function exportCSV() {
-    if (records.length === 0) {
-        showToast('暂无记录可导出');
-        return;
-    }
-    const header = 'Timestamp,DeviceName,DeviceMac,RawHex,Temperature,Humidity,Battery,IsNegative,RSSI';
-    const rows = records.map(r => [
-        escapeCsvField(r.timestamp),
-        escapeCsvField(r.deviceName),
-        escapeCsvField(r.deviceId),
-        escapeCsvField(r.rawData),
-        escapeCsvField(r.temperature),
-        escapeCsvField(r.humidity),
-        escapeCsvField(r.battery),
-        escapeCsvField(r.isNegative),
-        escapeCsvField(r.rssi ?? '')
-    ].join(','));
-    const csvText = '\uFEFF' + [header, ...rows].join('\n');
-    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const timeStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23);
-    a.download = `ibeacon温湿度记录_${timeStr}.csv`;
-    a.href = url;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast(`导出完成，共${records.length}条采集记录`);
-}
+            // 页面关闭时清理
+            window.addEventListener('beforeunload', async () => {
+                if (device && watching) {
+                    try {
+                        await device.gatt.disconnect();
+                    } catch (e) {}
+                }
+            });
 
-function clearAllData() {
-    if (!confirm('确认清空全部本地历史记录？数据无法恢复！')) return;
-    records = [];
-    currentDevices.clear();
-    localStorage.removeItem('ibeacon_records');
-    updateBadge();
-    renderHistory();
-    renderChart();
-    document.getElementById('latestData').style.display = 'none';
-    document.getElementById('deviceList').innerHTML = '';
-    document.getElementById('filterCount').textContent = '已显示 0 台';
-    showToast('所有记录与在线设备已清空');
-}
+            // 初始化显示
+            updateDisplay(null, null, null, null);
 
-// ============================================================
-//  工具函数
-// ============================================================
-function formatTime(iso) {
-    const d = new Date(iso);
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const h = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    const s = String(d.getSeconds()).padStart(2, '0');
-    return `${d.getFullYear()}-${m}-${day} ${h}:${mi}:${s}`;
-}
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// ============================================================
-//  初始化 & 响应式
-// ============================================================
-updateBadge();
-document.getElementById('filterCount').textContent = '已显示 0 台';
-
-window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-        if (document.getElementById('tab-chart').classList.contains('active')) renderChart();
-    }, CHART_RESIZE_DELAY);
-});
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden && isScanning) {
-        console.log('页面切后台，维持BLE连接');
-    }
-});
-</script>
+            // 检查浏览器支持
+            if (!navigator.bluetooth) {
+                statusText.textContent = '不支持';
+                statusDetail.textContent = '⚠️ 此浏览器不支持 Web Bluetooth，请使用 Chrome 80+';
+                connectBtn.disabled = true;
+            }
+        })();
+    </script>
 </body>
 </html>
