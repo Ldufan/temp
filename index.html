@@ -84,7 +84,7 @@
   .btn-sm { padding:5px 12px; font-size:11px; width:auto; }
 
   /* 调试面板 */
-  .debug-overlay { position:fixed; bottom:56px; left:0; right:0; background:rgba(33,33,33,0.95); color:#E0E0E0; max-height:200px; overflow-y:auto; font-size:11px; font-family:monospace; z-index:8; padding:8px; display:none; }
+  .debug-overlay { position:fixed; bottom:56px; left:0; right:0; background:rgba(33,33,33,0.95); color:#E0E0E0; max-height:50vh; overflow-y:auto; font-size:12px; font-family:monospace; z-index:8; padding:8px; display:none; }
   .debug-overlay.visible { display:block; }
   .debug-entry { border-bottom:1px solid #424242; padding:4px 0; }
   .debug-entry .ok { color:#4CAF50; }
@@ -118,6 +118,7 @@
     <div class="count-bar">
       <span>&#128246;</span>
       <span class="count" id="deviceCount">目标 Beacon 0 台</span>
+      <span style="font-size:11px; color:#757575; margin-left:auto;" id="adCountLabel"></span>
     </div>
     <div class="filter-bar">
       <input type="text" id="macInput" placeholder="输入目标 MAC（如 52:07:10:25:01:0F）" autocomplete="off">
@@ -254,6 +255,7 @@ async function dbCount() {
 
 // ========================== 状态 ==========================
 let scanBluetooth = null;
+let adCount = 0;          // 收到的原始广播总数
 let isScanning = false;
 let devices = {};           // { mac: { name,mac,rssi,ts,temperature,humidity,battery } }
 let logEntries = [];        // [{ ts, t, h, b, r, m }]
@@ -317,29 +319,29 @@ function dataViewToHex(dv) {
   const bytes = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
 }
-
 function handleAdvertisement(event) {
-  console.log('收到广播:', event.device?.id, 'RSSI:', event.rssi,
-    'MFG keys:', event.manufacturerData ? [...event.manufacturerData.keys()].map(k=>k.toString(16)) : 'none',
-    'SVC keys:', event.serviceData ? [...event.serviceData.keys()] : 'none');
+  adCount++;
   const dev = event.device;
   const mac = (dev.id || '').toUpperCase();
   const name = event.deviceName || dev.name || '未知设备';
   const rssi = event.rssi;
 
-  // 原始 hex dump
+  // 提取原始 hex（在任何过滤之前，确保调试台能看到所有广播）
   let rawHex = '';
   if (event.manufacturerData) {
     for (const [key, dv] of event.manufacturerData) {
-      rawHex += `[MFG:${key.toString(16).toUpperCase()}] ${dataViewToHex(dv)} `;
+      rawHex += '[MFG:' + key.toString(16).toUpperCase() + '] ' + dataViewToHex(dv) + ' ';
     }
   }
   if (event.serviceData) {
     for (const [key, dv] of event.serviceData) {
-      rawHex += `[SVC:${key.toUpperCase()}] ${dataViewToHex(dv)} `;
+      rawHex += '[SVC:' + key.toUpperCase() + '] ' + dataViewToHex(dv) + ' ';
     }
   }
   rawHex = rawHex.trim();
+
+  // 先记录所有原始广播到调试台（不过滤）
+  addDebugRaw(mac, rssi, rawHex);
 
   // MAC 过滤
   const filterMac = cfg.macFilter ? cfg.mac.trim().replace(/[:\-]/g, '').toUpperCase() : null;
@@ -356,12 +358,11 @@ function handleAdvertisement(event) {
       }
     }
     if (!uuidOk) {
-      // 仍记录调试日志但跳过
       addDebug(mac, rssi, rawHex, false, false, null, null, null);
       return;
     }
   } else {
-    uuidOk = true; // 未启用过滤，视作匹配
+    uuidOk = true;
   }
 
   // 提取传感器数据
@@ -387,8 +388,6 @@ function handleAdvertisement(event) {
     temp = last.temperature;
     hum = last.humidity;
     battery = last.battery;
-  } else if (!hasSensor) {
-    // 首次尚未收到传感器包，仍显示设备
   }
 
   // 更新设备列表
@@ -406,6 +405,12 @@ function handleAdvertisement(event) {
   }
 
   renderDevices();
+}
+
+function addDebugRaw(mac, rssi, hex) {
+  debugLog.push({ ts: Date.now(), mac, rssi, hex, uuidOk: null, hasSensor: null, temp: null, hum: null, bat: null, raw: true });
+  if (debugLog.length > 500) debugLog.shift();
+  renderDebug();
 }
 
 function addDebug(mac, rssi, hex, uuidOk, hasSensor, temp, hum, bat) {
@@ -434,6 +439,12 @@ async function startScan() {
       scanBluetooth.onadvertisementreceived = handleAdvertisement;
     }
     isScanning = true;
+    adCount = 0;
+    setTimeout(function() {
+      if (isScanning && adCount === 0) {
+        alert("扫描已运行 5 秒但未收到任何广播。\n可能原因：\n1. 附近没有 BLE 设备在广播\n2. 蓝牙权限未授予\n3. 浏览器版本不兼容");
+      }
+    }, 5000);
     updateScanUI();
     return true;
   } catch (e) {
@@ -484,7 +495,8 @@ function renderDevices() {
   arr.forEach(d => { newDevs[d.mac] = d; });
   devices = newDevs;
 
-  document.getElementById('deviceCount').textContent = `目标 Beacon ${arr.length} 台`;
+  document.getElementById('deviceCount').textContent = '目标 Beacon ' + arr.length + ' 台';
+  document.getElementById('adCountLabel').textContent = adCount > 0 ? '共收到 ' + adCount + ' 条广播' : '';
 
   if (arr.length === 0) {
     list.innerHTML = `<div class="empty"><div class="icon">&#128268;</div><p>${isScanning ? '正在扫描附近的 BLE 设备...' : '点击下方按钮开始扫描'}</p></div>`;
@@ -517,14 +529,21 @@ function renderDebug() {
   const panel = document.getElementById('debugPanel');
   if (!debugVisible) return;
   panel.innerHTML = debugLog.slice().reverse().map(e => {
+    if (e.raw) {
+      return '<div class="debug-entry" style="color:#9E9E9E">' +
+        '<span>' + fmtTime(e.ts) + '</span> <span>' + esc(e.mac) + '</span> RSSI:' + e.rssi +
+        ' <span style="color:#FFD54F">[RAW]</span>' +
+        '<br><span class="hex" style="font-size:10px">' + esc(e.hex) + '</span>' +
+        '</div>';
+    }
     const uidCls = e.uuidOk ? 'ok' : 'fail';
     const uidTxt = e.uuidOk ? '✓UUID' : '✗UUID';
-    const sensorTxt = e.hasSensor ? `T:${e.temp?.toFixed(1) ?? '-'} H:${e.hum?.toFixed(1) ?? '-'} B:${e.bat ?? '-'}` : '无传感器';
-    return `<div class="debug-entry">
-      <span>${fmtTime(e.ts)}</span> <span>${esc(e.mac)}</span> RSSI:${e.rssi}
-      <span class="${uidCls}">${uidTxt}</span> <span>${sensorTxt}</span>
-      <br><span class="hex">${esc(e.hex)}</span>
-    </div>`;
+    const sensorTxt = e.hasSensor ? 'T:' + (e.temp?.toFixed(1) ?? '-') + ' H:' + (e.hum?.toFixed(1) ?? '-') + ' B:' + (e.bat ?? '-') : '无传感器';
+    return '<div class="debug-entry">' +
+      '<span>' + fmtTime(e.ts) + '</span> <span>' + esc(e.mac) + '</span> RSSI:' + e.rssi +
+      ' <span class="' + uidCls + '">' + uidTxt + '</span> <span>' + sensorTxt + '</span>' +
+      '<br><span class="hex">' + esc(e.hex) + '</span>' +
+      '</div>';
   }).join('');
 }
 
