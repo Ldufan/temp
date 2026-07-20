@@ -261,7 +261,7 @@
         </div>
         <div class="config-row">
             <div class="checkbox-wrap">
-                <input type="checkbox" id="showAllCheck">
+                <input type="checkbox" id="showAllCheck" checked>
                 <label for="showAllCheck">显示所有广播（调试）</label>
             </div>
             <div class="hint">开启后打印每个广播的设备信息及所有服务UUID</div>
@@ -334,7 +334,7 @@
 
     <script>
         // ================================================================
-        //  全广播调试版 – 打印所有扫描到的广播信息
+        //  全广播调试版 – 默认显示所有广播
         // ================================================================
         let isScanning = false;
         let records = [];
@@ -519,7 +519,6 @@
                 log(`✅ 匹配设备: ${deviceName} (${deviceAddress})`, 'success');
                 log(` RSSI: ${rssi} dBm`, 'info');
 
-                // 打印所有服务 UUID（供参考）
                 if (keys.length > 1) {
                     log(` 其他服务: ${keys.filter(k => k.toLowerCase() !== serviceUuid.toLowerCase()).join(', ')}`, 'debug');
                 }
@@ -756,13 +755,13 @@
             updateScanUI(false);
             if (records.length === 0) noDataMsg.style.display = 'block';
             log('就绪，等待扫描...', 'info');
-            log('💡 提示：开启「显示所有广播」可查看所有扫描到的设备和服务', 'info');
+            log('💡 提示：「显示所有广播」已默认开启，您将在日志中看到所有附近的BLE设备', 'info');
         }
 
         document.addEventListener('DOMContentLoaded', init);
         if (document.readyState === 'complete' || document.readyState === 'interactive') init();
 
-        console.log('🌡️ BLE 温湿度监测 – 全广播调试版');
+        console.log('🌡️ BLE 温湿度监测 – 全广播调试版 (默认显示所有广播)');
     </script>
 </body>
 </html>
