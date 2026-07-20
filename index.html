@@ -33,7 +33,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             padding: 0 4px;
         }
         .app-title {
@@ -71,15 +71,8 @@
             animation: pulse-dot 1.2s ease-in-out infinite;
         }
         @keyframes pulse-dot {
-            0%,
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-            50% {
-                transform: scale(1.5);
-                opacity: 0.6;
-            }
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.6; }
         }
         .status-dot.error {
             background: #f87171;
@@ -90,6 +83,46 @@
             color: #e8edf5;
             min-width: 20px;
             text-align: center;
+        }
+
+        /* ---------- config row ---------- */
+        .config-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: rgba(255,255,255,0.04);
+            padding: 8px 12px;
+            border-radius: 16px;
+            margin-bottom: 14px;
+            border: 1px solid rgba(255,255,255,0.06);
+            flex-wrap: wrap;
+        }
+        .config-row label {
+            font-size: 13px;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+        .config-row input {
+            flex: 1;
+            min-width: 180px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 8px 12px;
+            color: #e8edf5;
+            font-size: 13px;
+            font-family: monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .config-row input:focus {
+            border-color: #60b0ff;
+        }
+        .config-row .hint {
+            font-size: 11px;
+            color: #64748b;
+            width: 100%;
+            margin-top: 2px;
         }
 
         /* ---------- main card ---------- */
@@ -131,15 +164,9 @@
             color: #ffffff;
             transition: color 0.4s;
         }
-        .main-card .temp-value.cold {
-            color: #7dd3fc;
-        }
-        .main-card .temp-value.mild {
-            color: #fcd34d;
-        }
-        .main-card .temp-value.hot {
-            color: #fca5a5;
-        }
+        .main-card .temp-value.cold { color: #7dd3fc; }
+        .main-card .temp-value.mild { color: #fcd34d; }
+        .main-card .temp-value.hot { color: #fca5a5; }
         .main-card .temp-unit {
             font-size: 28px;
             font-weight: 400;
@@ -193,17 +220,10 @@
             color: #94a3b8;
             margin-left: 2px;
         }
-        .metric-item .value.rssi-val {
-            color: #94a3b8;
-        }
-        .metric-item.battery .value {
-            color: #4ade80;
-        }
-        .metric-item.humidity .value {
-            color: #60b0ff;
-        }
+        .metric-item .value.rssi-val { color: #94a3b8; }
+        .metric-item.battery .value { color: #4ade80; }
+        .metric-item.humidity .value { color: #60b0ff; }
 
-        /* ---------- no-data placeholder ---------- */
         .no-data {
             text-align: center;
             padding: 20px 0 8px;
@@ -279,27 +299,16 @@
             transition: background 0.15s;
             border-bottom: 1px solid rgba(255, 255, 255, 0.03);
         }
-        .history-item:last-child {
-            border-bottom: none;
-        }
-        .history-item:hover {
-            background: rgba(255, 255, 255, 0.04);
-        }
+        .history-item:last-child { border-bottom: none; }
+        .history-item:hover { background: rgba(255, 255, 255, 0.04); }
         .history-item .h-time {
             color: #94a3b8;
             font-size: 12px;
             font-variant-numeric: tabular-nums;
         }
-        .history-item .h-temp {
-            font-weight: 500;
-            color: #fcd34d;
-        }
-        .history-item .h-humid {
-            color: #60b0ff;
-        }
-        .history-item .h-batt {
-            color: #4ade80;
-        }
+        .history-item .h-temp { font-weight: 500; color: #fcd34d; }
+        .history-item .h-humid { color: #60b0ff; }
+        .history-item .h-batt { color: #4ade80; }
         .history-item .h-rssi {
             color: #94a3b8;
             font-size: 12px;
@@ -342,9 +351,7 @@
             color: #e8edf5;
             border: 1px solid rgba(255, 255, 255, 0.06);
         }
-        .actions .btn:active {
-            transform: scale(0.97);
-        }
+        .actions .btn:active { transform: scale(0.97); }
         .actions .btn-primary {
             background: linear-gradient(135deg, #2563eb, #7c3aed);
             border-color: transparent;
@@ -403,65 +410,35 @@
             opacity: 1;
             transform: translateX(-50%) translateY(0);
         }
-        .toast.error {
-            border-color: rgba(248, 113, 113, 0.3);
-        }
-        .toast.success {
-            border-color: rgba(74, 222, 128, 0.3);
-        }
+        .toast.error { border-color: rgba(248, 113, 113, 0.3); }
+        .toast.success { border-color: rgba(74, 222, 128, 0.3); }
 
         /* ---------- responsive ---------- */
         @media (max-width: 400px) {
-            .main-card .temp-value {
-                font-size: 56px;
-            }
-            .main-card .temp-unit {
-                font-size: 22px;
-            }
-            .metrics {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 6px;
-            }
-            .metric-item .value {
-                font-size: 17px;
-            }
+            .main-card .temp-value { font-size: 56px; }
+            .main-card .temp-unit { font-size: 22px; }
+            .metrics { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .metric-item .value { font-size: 17px; }
             .history-item {
                 font-size: 12px;
                 grid-template-columns: 70px 1fr 1fr 1fr 40px;
                 padding: 6px 8px;
             }
-            .actions .btn {
-                font-size: 13px;
-                padding: 12px 12px;
-                min-width: 80px;
-            }
+            .actions .btn { font-size: 13px; padding: 12px 12px; min-width: 80px; }
+            .config-row input { min-width: 120px; }
         }
         @media (min-width: 600px) {
-            body {
-                padding: 30px 20px;
-            }
-            .main-card .temp-value {
-                font-size: 88px;
-            }
+            body { padding: 30px 20px; }
+            .main-card .temp-value { font-size: 88px; }
         }
 
-        /* ---------- utils ---------- */
-        .hidden {
-            display: none !important;
-        }
-        .text-muted {
-            color: #64748b;
-        }
-        .mt-8 {
-            margin-top: 8px;
-        }
-        .gap-8 {
-            gap: 8px;
-        }
+        .hidden { display: none !important; }
+        .text-muted { color: #64748b; }
+        .mt-8 { margin-top: 8px; }
+        .gap-8 { gap: 8px; }
     </style>
 </head>
 <body>
-
     <div id="app">
 
         <!-- header -->
@@ -474,6 +451,13 @@
                 <span>📋 <span class="record-count" id="recordCount">0</span></span>
             </div>
         </header>
+
+        <!-- UUID 配置 -->
+        <div class="config-row">
+            <label for="uuidInput">服务 UUID</label>
+            <input type="text" id="uuidInput" value="00003180-0000-1000-3000-00805fb34fb" spellcheck="false">
+            <div class="hint">💡 必须是标准格式 8-4-4-4-12，例如 0000180F-0000-1000-8000-00805F9B34FB</div>
+        </div>
 
         <!-- main card -->
         <section class="main-card" id="mainCard">
@@ -534,24 +518,12 @@
 
     <script>
         // ============================================================
-        //  CONFIG
-        // ============================================================
-        // 用户指定的服务 UUID（注意：实际使用时请确保与设备广播一致）
-        const SERVICE_UUID = '0x000003180-0000-1000-8000-00805f9b34fb';
-        // 备用：如果上述无效，可尝试用户原始格式（但可能不合规）
-        // const SERVICE_UUID = '00000318-0000-1000-3000-00805fb34fb';
-
-        const DB_NAME = 'db-ble-monitor-db';
-        const STORE_NAME = 'store-records';
-        const MAX_HISTORY_DISPLAY = 200; // 界面最多显示条数
-
-        // ============================================================
         //  STATE
         // ============================================================
         let isScanning = false;
-        let records = []; // 内存缓存（最新在前）
+        let records = [];
         let db = null;
-        let lastData = null; // 最后一次解析的数据
+        let lastData = null;
 
         // DOM refs
         const $ = id => document.getElementById(id);
@@ -570,6 +542,11 @@
         const exportBtn = $('exportBtn');
         const clearHistoryBtn = $('clearHistoryBtn');
         const toast = $('toast');
+        const uuidInput = $('uuidInput');
+
+        const DB_NAME = 'db-ble-monitor-db';
+        const STORE_NAME = 'store-records';
+        const MAX_HISTORY_DISPLAY = 200;
 
         // ============================================================
         //  INDEXED DB
@@ -604,7 +581,7 @@
                 const tx = db.transaction(STORE_NAME, 'readonly');
                 const store = tx.objectStore(STORE_NAME);
                 const index = store.index('time');
-                const req = index.openCursor(null, 'prev'); // 最新在前
+                const req = index.openCursor(null, 'prev');
                 const result = [];
                 req.onsuccess = (e) => {
                     const cursor = e.target.result;
@@ -629,16 +606,6 @@
             });
         }
 
-        function deleteRecord(db, id) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.delete(id);
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
-            });
-        }
-
         // ============================================================
         //  BLE
         // ============================================================
@@ -648,9 +615,22 @@
                 return false;
             }
 
+            const uuid = uuidInput.value.trim();
+            if (!uuid) {
+                showToast('⚠️ 请输入服务 UUID', 'error');
+                return false;
+            }
+
+            // 简单验证格式：8-4-4-4-12
+            const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+            if (!uuidRegex.test(uuid)) {
+                showToast('⚠️ UUID 格式错误，请使用标准 8-4-4-4-12 格式', 'error');
+                return false;
+            }
+
             try {
                 const scan = await navigator.bluetooth.requestLEScan({
-                    filters: [{ services: [SERVICE_UUID] }],
+                    filters: [{ services: [uuid] }],
                     keepRepeatedDevices: true,
                     acceptAllAdvertisements: false,
                 });
@@ -658,10 +638,7 @@
                 updateScanUI(true);
                 showToast('✅ 扫描已启动，等待广播数据...', 'success');
 
-                // 监听广播
                 navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisementReceived);
-
-                // 自动停止扫描（可选），但这里让用户手动停止
                 return true;
             } catch (err) {
                 console.error('requestLEScan error:', err);
@@ -691,18 +668,16 @@
         }
 
         function onAdvertisementReceived(event) {
-            // 获取服务数据
             const serviceData = event.serviceData;
             if (!serviceData) return;
 
-            const dataView = serviceData.get(SERVICE_UUID);
+            const uuid = uuidInput.value.trim();
+            const dataView = serviceData.get(uuid);
             if (!dataView) {
-                // 尝试用原始UUID（如果不同）
-                // 有些浏览器可能规范化了UUID，这里不做复杂处理
+                // 尝试用大写？但一般浏览器会匹配，忽略
                 return;
             }
 
-            // 读取6字节
             if (dataView.byteLength < 6) {
                 console.warn('数据长度不足6字节:', dataView.byteLength);
                 return;
@@ -710,8 +685,7 @@
 
             const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, 6);
 
-            // 解析
-            const sign = bytes[0]; // 0x00 = 正, 0x01 = 负
+            const sign = bytes[0]; // 0x00 正, 0x01 负
             const tempInt = bytes[1];
             const tempFrac = bytes[2];
             const humidInt = bytes[3];
@@ -721,11 +695,6 @@
             let temperature = (sign === 0 ? 1 : -1) * (tempInt + tempFrac / 100);
             let humidity = humidInt + humidFrac / 100;
             let rssi = event.rssi !== undefined ? event.rssi : -100;
-
-            // 简单校验
-            if (battery > 100 || battery < 0) {
-                // 电量可能不准确，但保留
-            }
 
             const now = new Date();
             const record = {
@@ -737,20 +706,16 @@
                 rssi: rssi,
             };
 
-            // 更新UI
             updateMainDisplay(record);
             lastData = record;
 
-            // 保存到IndexedDB
             if (db) {
                 saveRecord(db, record).then(() => {
-                    // 重新加载并刷新列表
                     refreshHistory();
                 }).catch(err => {
                     console.error('保存记录失败:', err);
                 });
             } else {
-                // 如果db还没初始化，先存到内存，稍后同步
                 records.unshift(record);
                 if (records.length > 1000) records.pop();
                 renderHistory();
@@ -785,33 +750,23 @@
             const b = record.battery;
             const r = record.rssi;
 
-            // 温度
             tempDisplay.textContent = t.toFixed(1);
-            // 颜色
             tempDisplay.className = 'temp-value';
             if (t < 10) tempDisplay.classList.add('cold');
             else if (t < 28) tempDisplay.classList.add('mild');
             else tempDisplay.classList.add('hot');
 
-            // 标签
             tempLabel.textContent = t < 10 ? '❄️ 凉爽' : t < 28 ? '🌤️ 舒适' : '☀️ 温暖';
 
-            // 湿度
             humidDisplay.innerHTML = h.toFixed(1) + ' <span class="sub">%</span>';
-
-            // 电量
             battDisplay.innerHTML = b + ' <span class="sub">%</span>';
-
-            // RSSI
             rssiDisplay.innerHTML = r + ' <span class="sub">dBm</span>';
 
-            // 隐藏无数据提示
             noDataMsg.style.display = 'none';
         }
 
         function updateRecordCount() {
-            const count = records.length;
-            recordCount.textContent = count;
+            recordCount.textContent = records.length;
         }
 
         // ============================================================
@@ -819,7 +774,6 @@
         // ============================================================
         function renderHistory() {
             const list = historyList;
-            // 移除空状态
             const empty = historyEmpty;
             if (records.length === 0) {
                 list.innerHTML = '';
@@ -829,7 +783,6 @@
             }
             empty.style.display = 'none';
 
-            // 只显示最近 MAX_HISTORY_DISPLAY 条
             const show = records.slice(0, MAX_HISTORY_DISPLAY);
             let html = '';
             for (const r of show) {
@@ -877,7 +830,6 @@
                 return;
             }
 
-            // 按时间正序导出（最早在前）
             const sorted = [...records].reverse();
             const header = '时间,温度(°C),湿度(%),电量(%),RSSI(dBm)';
             const rows = sorted.map(r => {
@@ -886,7 +838,7 @@
             });
             const csv = [header, ...rows].join('\n');
 
-            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -903,7 +855,6 @@
         //  TOAST
         // ============================================================
         let toastTimer = null;
-
         function showToast(msg, type) {
             toast.textContent = msg;
             toast.className = 'toast';
@@ -920,15 +871,11 @@
         //  INIT
         // ============================================================
         async function init() {
-            // 打开数据库
             try {
                 db = await openDB();
-                // 加载历史
                 const all = await loadAllRecords(db);
                 records = all;
                 renderHistory();
-
-                // 如果有数据，显示最新一条
                 if (records.length > 0) {
                     const latest = records[0];
                     updateMainDisplay(latest);
@@ -936,11 +883,9 @@
                 }
             } catch (err) {
                 console.error('数据库初始化失败:', err);
-                // 降级：使用内存存储
                 showToast('⚠️ 存储初始化失败，数据仅保留在内存', 'error');
             }
 
-            // 事件绑定
             scanBtn.addEventListener('click', async () => {
                 if (isScanning) {
                     stopScan();
@@ -963,7 +908,6 @@
                     }
                     records = [];
                     renderHistory();
-                    // 如果当前没有新数据，恢复占位
                     if (!isScanning) {
                         noDataMsg.style.display = 'block';
                         tempDisplay.textContent = '--';
@@ -980,32 +924,24 @@
                 }
             });
 
-            // 页面关闭时停止扫描
             window.addEventListener('beforeunload', () => {
                 if (isScanning) {
                     try { navigator.bluetooth.stopLEScan(); } catch (e) {}
                 }
             });
 
-            // 更新状态
             updateScanUI(false);
             if (records.length === 0) {
                 noDataMsg.style.display = 'block';
             }
         }
 
-        // 启动
         document.addEventListener('DOMContentLoaded', init);
-
-        // 如果DOM已加载，直接初始化
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             init();
         }
 
         console.log('🌡️ BLE 温湿度监测 PWA 已加载');
-        console.log('📡 服务 UUID:', SERVICE_UUID);
-        console.log('💾 数据库:', DB_NAME, ' / 存储:', STORE_NAME);
     </script>
-
 </body>
 </html>
