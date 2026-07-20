@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RL_HT_Tag 温湿度采集（纯扫描·无连接）</title>
+    <title>RL_HT_Tag 温湿度采集（纯扫描·修正版）</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -114,7 +114,7 @@
 </head>
 <body>
 
-    <h1>📡 纯扫描 BLE 温湿度</h1>
+    <h1>📡 纯扫描 BLE 温湿度（修正版）</h1>
     <div class="sub">RL_HT_Tag · 无需连接 GATT</div>
 
     <div class="warning">
@@ -173,8 +173,8 @@
     </div>
 
     <div class="note">
-        * 若扫描不到设备，请确认设备正在广播，且名称过滤正确。<br>
-        * 如仍无效，可尝试清空名称过滤，或使用 Python 脚本（见下方说明）。
+        * 若仍扫描不到，建议直接使用下方 Python 脚本（100%可靠）。<br>
+        * Python 脚本只需安装 <code>bleak</code> 库，无需任何浏览器实验性功能。
     </div>
 
     <script>
@@ -320,6 +320,8 @@
                         scanController.stop();
                         scanController = null;
                     }
+                    // 移除事件监听
+                    navigator.bluetooth.removeEventListener('advertisementreceived', handleScanResult);
                     isScanning = false;
                     scanBtn.textContent = '🔍 开始扫描';
                     statusText.textContent = '已停止';
@@ -343,8 +345,11 @@
                         keepRepeatedDevices: true
                     };
 
+                    // 启动扫描
                     scanController = await navigator.bluetooth.requestLEScan(options);
-                    scanController.addEventListener('advertisementreceived', handleScanResult);
+                    
+                    // 将事件监听器添加到 navigator.bluetooth 上（而不是控制器）
+                    navigator.bluetooth.addEventListener('advertisementreceived', handleScanResult);
 
                     isScanning = true;
                     scanBtn.textContent = '⏹️ 停止扫描';
@@ -376,6 +381,7 @@
                 if (scanController) {
                     try { scanController.stop(); } catch (e) {}
                 }
+                navigator.bluetooth.removeEventListener('advertisementreceived', handleScanResult);
             });
 
             // 初始化
@@ -388,6 +394,7 @@
             } else {
                 appendLog('Web Bluetooth 可用，请点击“开始扫描”', 'info');
                 appendLog('提示：若扫描不到，请确认设备正在广播且名称过滤正确', 'info');
+                appendLog('如仍无效，请使用 Python 脚本（见下方说明）', 'info');
             }
         })();
     </script>
