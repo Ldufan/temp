@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RL_HT_Tag 温湿度（匹配 00001804）</title>
+    <title>BLE 温湿度扫描器（可配置 UUID）</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -40,6 +40,11 @@
             align-items: center;
             gap: 10px;
             margin: 10px 0;
+        }
+        .input-group label {
+            font-weight: 500;
+            color: #1a3b5d;
+            white-space: nowrap;
         }
         .input-group input {
             flex: 1;
@@ -114,8 +119,8 @@
 </head>
 <body>
 
-    <h1>🌡️ RL_HT_Tag 温湿度</h1>
-    <div class="sub">匹配 Service Data UUID: 00001804 或 0318</div>
+    <h1>📡 BLE 温湿度扫描器</h1>
+    <div class="sub">可配置 Service Data UUID 匹配</div>
 
     <div class="warning">
         ⚠️ 需启用 Chrome 实验性功能：<br>
@@ -150,8 +155,8 @@
     </div>
 
     <div class="input-group">
-        <label for="nameFilter">设备名称包含：</label>
-        <input type="text" id="nameFilter" value="RL_HT" placeholder="可选过滤" />
+        <label for="uuidFilter">匹配 UUID 包含：</label>
+        <input type="text" id="uuidFilter" value="0318" placeholder="例如 0318 或 00001804" />
     </div>
 
     <button id="scanBtn">🔍 开始扫描</button>
@@ -173,8 +178,8 @@
     </div>
 
     <div class="note">
-        * 匹配 UUID 包含 "1804" 或 "0318" 的 Service Data。<br>
-        * 若仍无法解析，请查看日志中打印的所有 Service Data UUID，并运行 Python 脚本（下方提供）。
+        * 匹配 Service Data UUID 中包含您输入字符串的数据块（不区分大小写）。<br>
+        * 若无法解析，请查看日志中打印的所有 Service Data UUID，调整匹配字符串。
     </div>
 
     <script>
@@ -187,7 +192,7 @@
             const humSpan = document.getElementById('humidity');
             const rssiSpan = document.getElementById('rssi');
             const rawSpan = document.getElementById('rawData');
-            const nameFilterInput = document.getElementById('nameFilter');
+            const uuidFilterInput = document.getElementById('uuidFilter');
             const logArea = document.getElementById('logArea');
             const clearLogBtn = document.getElementById('clearLogBtn');
 
@@ -250,13 +255,7 @@
                     appendLog(`完整广播包: ${rawHex.trim()}`, 'info');
                 } catch (e) {}
 
-                // 名称过滤
-                const filter = nameFilterInput.value.trim().toLowerCase();
                 const deviceName = result.name || '未知';
-                if (filter && !deviceName.toLowerCase().includes(filter)) {
-                    appendLog(`设备名 "${deviceName}" 不匹配过滤，忽略`, 'info');
-                    return;
-                }
                 deviceNameEl.textContent = deviceName;
 
                 const serviceData = result.serviceData;
@@ -269,12 +268,19 @@
                 const uuids = Array.from(serviceData.keys());
                 appendLog(`Service Data UUIDs: ${uuids.join(', ')}`, 'info');
 
-                // 匹配 UUID 包含 "1804" 或 "0318"
+                // 获取用户输入的匹配字符串
+                const filterStr = uuidFilterInput.value.trim();
+                if (!filterStr) {
+                    appendLog('未配置匹配字符串，请填写 UUID 包含的字符串', 'error');
+                    return;
+                }
+
+                // 查找包含 filterStr 的 UUID（不区分大小写）
                 let dataView = null;
                 let matchedUUID = null;
+                const lowerFilter = filterStr.toLowerCase();
                 for (const [key, value] of serviceData) {
-                    const lowerKey = key.toLowerCase();
-                    if (lowerKey.includes('1804') || lowerKey.includes('0318')) {
+                    if (key.toLowerCase().includes(lowerFilter)) {
                         dataView = value;
                         matchedUUID = key;
                         break;
@@ -282,7 +288,7 @@
                 }
 
                 if (!dataView) {
-                    appendLog('未找到包含 "1804" 或 "0318" 的 Service Data', 'error');
+                    appendLog(`未找到包含 "${filterStr}" 的 Service Data`, 'error');
                     // 尝试从厂商数据解析（兜底）
                     const manufacturerData = result.manufacturerData;
                     if (manufacturerData) {
@@ -415,7 +421,7 @@
                 appendLog('浏览器不支持 Web Bluetooth', 'error');
             } else {
                 appendLog('Web Bluetooth 可用，请点击“开始扫描”', 'info');
-                appendLog('提示：匹配 Service Data UUID 包含 "1804" 或 "0318"', 'info');
+                appendLog('提示：请填写要匹配的 UUID 包含字符串（如 0318）', 'info');
             }
         })();
     </script>
