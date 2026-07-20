@@ -319,6 +319,9 @@ function dataViewToHex(dv) {
 }
 
 function handleAdvertisement(event) {
+  console.log('收到广播:', event.device?.id, 'RSSI:', event.rssi,
+    'MFG keys:', event.manufacturerData ? [...event.manufacturerData.keys()].map(k=>k.toString(16)) : 'none',
+    'SVC keys:', event.serviceData ? [...event.serviceData.keys()] : 'none');
   const dev = event.device;
   const mac = (dev.id || '').toUpperCase();
   const name = event.deviceName || dev.name || '未知设备';
@@ -422,12 +425,17 @@ async function startScan() {
       acceptAllAdvertisements: true,
       keepRepeatedDevices: true,
     });
-    // 兼容不同 Chrome 版本的 API
-      if (typeof scanBluetooth.addEventListener === 'function') {
-        scanBluetooth.addEventListener('advertisementreceived', handleAdvertisement);
-      } else {
-        scanBluetooth.onadvertisementreceived = handleAdvertisement;
-      }
+    console.log('扫描已启动, scan 类型:', typeof scanBluetooth, '方法:', Object.keys(scanBluetooth).join(','));
+    // 兼容不同 Chrome 版本的事件绑定
+    if (typeof scanBluetooth.addEventListener === 'function') {
+      scanBluetooth.addEventListener('advertisementreceived', handleAdvertisement);
+    } else if (scanBluetooth.onadvertisementreceived !== undefined) {
+      scanBluetooth.onadvertisementreceived = handleAdvertisement;
+    } else {
+      console.error('无法绑定: scan 对象不支持事件', scanBluetooth);
+      alert('当前浏览器不支持 BLE 扫描事件，请升级 Chrome');
+      return false;
+    }
     isScanning = true;
     updateScanUI();
     return true;
@@ -443,7 +451,11 @@ async function startScan() {
 
 function stopScan() {
   if (scanBluetooth) {
-    scanBluetooth.abort();
+    try {
+      if (typeof scanBluetooth.stop === 'function') scanBluetooth.stop();
+      else if (typeof scanBluetooth.abort === 'function') scanBluetooth.abort();
+      console.log('扫描已停止');
+    } catch(e) { console.error('停止扫描异常:', e); }
     scanBluetooth = null;
   }
   isScanning = false;
