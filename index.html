@@ -1,786 +1,989 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0a1628">
-    <title>BLE 温湿度监测 (Filter 版)</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0a1628; color: #e8edf5;
-            min-height: 100vh; display: flex; justify-content: center;
-            padding: 16px 12px 30px;
-        }
-        #app { max-width: 480px; width: 100%; }
-        .app-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 12px; padding: 0 4px;
-        }
-        .app-title {
-            font-size: 20px; font-weight: 600;
-            background: linear-gradient(135deg, #60b0ff, #a78bfa);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .status-badge {
-            display: flex; align-items: center; gap: 10px;
-            font-size: 13px; color: #94a3b8;
-            background: rgba(255,255,255,0.06);
-            padding: 6px 14px 6px 12px; border-radius: 30px;
-            border: 1px solid rgba(255,255,255,0.06);
-            backdrop-filter: blur(4px);
-        }
-        .status-dot {
-            width: 10px; height: 10px; border-radius: 50%;
-            background: #475569; transition: background 0.3s;
-        }
-        .status-dot.scanning {
-            background: #22d3ee;
-            box-shadow: 0 0 12px rgba(34,211,238,0.6);
-            animation: pulse-dot 1.2s ease-in-out infinite;
-        }
-        @keyframes pulse-dot {
-            0%,100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.5); opacity: 0.6; }
-        }
-        .record-count { font-weight: 500; color: #e8edf5; min-width: 20px; text-align: center; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>温湿度扫描仪</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,sans-serif; background:#f5f5f5; color:#212121; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
-        .config-row {
-            display: flex; gap: 8px; align-items: center;
-            background: rgba(255,255,255,0.04);
-            padding: 8px 12px; border-radius: 16px; margin-bottom: 10px;
-            border: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap;
-        }
-        .config-row label {
-            font-size: 13px; color: #94a3b8; white-space: nowrap; min-width: 60px;
-        }
-        .config-row input {
-            flex: 1; min-width: 150px;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px; padding: 8px 12px;
-            color: #e8edf5; font-size: 13px; font-family: monospace;
-            outline: none; transition: border-color 0.2s;
-        }
-        .config-row input:focus { border-color: #60b0ff; }
-        .config-row .hint {
-            font-size: 11px; color: #64748b; width: 100%; margin-top: 2px;
-        }
-        .config-row .checkbox-wrap {
-            display: flex; align-items: center; gap: 6px;
-            font-size: 13px; color: #94a3b8;
-        }
-        .config-row .checkbox-wrap input[type="checkbox"] {
-            width: 18px; height: 18px; accent-color: #60b0ff;
-            background: rgba(0,0,0,0.3); border-radius: 4px;
-        }
+  /* 顶部栏 */
+  .topbar { background:#1976D2; color:#fff; padding:12px 16px; display:flex; align-items:center; gap:12px; z-index:10; }
+  .topbar h1 { font-size:18px; font-weight:700; flex:1; }
+  .topbar .debug-btn { width:36px; height:36px; border-radius:50%; border:none; background:rgba(255,255,255,0.2); color:#fff; font-size:18px; cursor:pointer; }
+  .topbar .debug-btn.active { background:#4CAF50; }
+  .status-dot { width:10px; height:10px; border-radius:50%; }
+  .status-dot.off { background:#FF5252; }
+  .status-dot.on { background:#4CAF50; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-        .main-card {
-            background: linear-gradient(145deg, #111d35, #0e172a);
-            border-radius: 28px; padding: 28px 22px 22px; margin-bottom: 18px;
-            border: 1px solid rgba(255,255,255,0.06);
-            box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-            position: relative; overflow: hidden;
-        }
-        .main-card .temp-wrap {
-            display: flex; align-items: baseline; justify-content: center; gap: 4px;
-            margin-bottom: 6px; position: relative; z-index: 1;
-        }
-        .main-card .temp-value {
-            font-size: 72px; font-weight: 300; letter-spacing: -2px; line-height: 1.1;
-            color: #ffffff; transition: color 0.4s;
-        }
-        .main-card .temp-value.cold { color: #7dd3fc; }
-        .main-card .temp-value.mild { color: #fcd34d; }
-        .main-card .temp-value.hot { color: #fca5a5; }
-        .main-card .temp-unit { font-size: 28px; font-weight: 400; color: #94a3b8; margin-left: 2px; }
-        .main-card .temp-label {
-            text-align: center; font-size: 14px; color: #64748b;
-            letter-spacing: 2px; text-transform: uppercase; margin-top: -2px; margin-bottom: 18px;
-            position: relative; z-index: 1;
-        }
-        .metrics {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-            margin-top: 6px; position: relative; z-index: 1;
-        }
-        .metric-item {
-            background: rgba(255,255,255,0.04); border-radius: 16px; padding: 12px 6px;
-            text-align: center; border: 1px solid rgba(255,255,255,0.04);
-        }
-        .metric-item .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
-        .metric-item .value { font-size: 20px; font-weight: 500; color: #e8edf5; }
-        .metric-item .value .sub { font-size: 13px; font-weight: 400; color: #94a3b8; margin-left: 2px; }
-        .metric-item .value.rssi-val { color: #94a3b8; }
-        .metric-item.battery .value { color: #4ade80; }
-        .metric-item.humidity .value { color: #60b0ff; }
-        .no-data { text-align: center; padding: 20px 0 8px; color: #475569; font-size: 14px; }
-        .no-data .icon { font-size: 32px; margin-bottom: 6px; opacity: 0.5; }
+  /* Tab 内容 */
+  .content { flex:1; overflow-y:auto; padding-bottom:60px; }
+  .tab-page { display:none; padding:8px 12px; }
+  .tab-page.active { display:block; }
 
-        .history-section {
-            background: rgba(255,255,255,0.03); border-radius: 20px;
-            padding: 16px 0 4px; border: 1px solid rgba(255,255,255,0.04); margin-bottom: 14px;
-        }
-        .history-header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0 18px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .history-header h3 { font-size: 15px; font-weight: 500; color: #c8d0dc; letter-spacing: 0.3px; }
-        .history-header .clear-btn {
-            background: none; border: none; color: #64748b; font-size: 13px;
-            cursor: pointer; padding: 4px 10px; border-radius: 8px;
-            transition: background 0.2s, color 0.2s;
-        }
-        .history-header .clear-btn:hover { background: rgba(248,113,113,0.12); color: #f87171; }
-        .history-list {
-            max-height: 200px; overflow-y: auto; padding: 4px 6px 6px;
-        }
-        .history-list::-webkit-scrollbar { width: 3px; }
-        .history-list::-webkit-scrollbar-track { background: transparent; }
-        .history-list::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        .history-item {
-            display: grid; grid-template-columns: 80px 1fr 1fr 1fr 50px;
-            gap: 4px; padding: 8px 12px; border-radius: 12px; font-size: 13px;
-            align-items: center; border-bottom: 1px solid rgba(255,255,255,0.03);
-        }
-        .history-item:last-child { border-bottom: none; }
-        .history-item .h-time { color: #94a3b8; font-size: 12px; }
-        .history-item .h-temp { font-weight: 500; color: #fcd34d; }
-        .history-item .h-humid { color: #60b0ff; }
-        .history-item .h-batt { color: #4ade80; }
-        .history-item .h-rssi { color: #94a3b8; font-size: 12px; text-align: right; }
-        .history-empty { text-align: center; color: #475569; padding: 28px 0 20px; font-size: 14px; }
-        .history-empty .icon { font-size: 28px; margin-bottom: 6px; opacity: 0.4; }
+  /* 底部导航栏 */
+  .navbar { display:flex; background:#fff; border-top:1px solid #e0e0e0; z-index:10; }
+  .nav-item { flex:1; text-align:center; padding:8px 0 4px; cursor:pointer; color:#757575; font-size:11px; border:none; background:none; }
+  .nav-item.active { color:#1976D2; }
+  .nav-item .icon { font-size:22px; display:block; margin-bottom:2px; }
 
-        .log-section {
-            background: rgba(0,0,0,0.3); border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.05); margin-bottom: 14px; padding: 10px 12px;
-        }
-        .log-header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
-        }
-        .log-header span { font-size: 13px; color: #94a3b8; font-weight: 500; }
-        .log-header .log-clear {
-            background: none; border: none; color: #64748b; font-size: 12px;
-            cursor: pointer; padding: 2px 8px; border-radius: 6px;
-        }
-        .log-header .log-clear:hover { background: rgba(255,255,255,0.06); color: #e8edf5; }
-        .log-box {
-            background: rgba(0,0,0,0.4); border-radius: 10px; padding: 8px 10px;
-            max-height: 250px; overflow-y: auto;
-            font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6;
-            color: #c8d0dc; white-space: pre-wrap; word-break: break-all;
-        }
-        .log-box::-webkit-scrollbar { width: 3px; }
-        .log-box::-webkit-scrollbar-track { background: transparent; }
-        .log-box::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        .log-entry { border-bottom: 1px solid rgba(255,255,255,0.03); padding: 2px 0; }
-        .log-entry .log-time { color: #64748b; margin-right: 8px; }
-        .log-entry .log-msg { color: #e8edf5; }
-        .log-entry .log-msg.warn { color: #fbbf24; }
-        .log-entry .log-msg.error { color: #f87171; }
-        .log-entry .log-msg.success { color: #4ade80; }
-        .log-entry .log-msg.debug { color: #a78bfa; }
+  /* 设备计数栏 */
+  .count-bar { background:#fff; border-radius:8px; padding:10px 14px; margin-bottom:8px; display:flex; align-items:center; gap:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+  .count-bar .count { font-size:14px; color:#1976D2; font-weight:600; }
 
-        .actions {
-            display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px;
-        }
-        .actions .btn {
-            flex: 1; min-width: 100px; padding: 14px 16px;
-            border: none; border-radius: 16px; font-size: 15px; font-weight: 500;
-            cursor: pointer; transition: all 0.25s ease;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            background: rgba(255,255,255,0.06); color: #e8edf5;
-            border: 1px solid rgba(255,255,255,0.06);
-        }
-        .actions .btn:active { transform: scale(0.97); }
-        .actions .btn-primary {
-            background: linear-gradient(135deg, #2563eb, #7c3aed);
-            border-color: transparent; color: #fff;
-            box-shadow: 0 4px 16px rgba(37,99,235,0.25);
-        }
-        .actions .btn-primary.scanning {
-            background: linear-gradient(135deg, #dc2626, #b91c1c);
-            box-shadow: 0 4px 16px rgba(220,38,38,0.25);
-        }
-        .actions .btn-secondary {
-            background: rgba(255,255,255,0.05);
-            border-color: rgba(255,255,255,0.08);
-        }
-        .actions .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  /* MAC 过滤栏 */
+  .filter-bar { display:flex; align-items:center; gap:8px; margin-bottom:8px; background:#fff; border-radius:8px; padding:6px 12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+  .filter-bar input { flex:1; border:1px solid #e0e0e0; border-radius:6px; padding:8px; font-size:13px; font-family:monospace; }
+  .filter-bar input:disabled { background:#f5f5f5; color:#bdbdbd; }
+  .toggle { position:relative; width:42px; height:24px; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle .slider { position:absolute; cursor:pointer; top:0;left:0;right:0;bottom:0; background:#ccc; border-radius:24px; transition:.3s; }
+  .toggle .slider:before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
+  .toggle input:checked+.slider { background:#1976D2; }
+  .toggle input:checked+.slider:before { transform:translateX(18px); }
 
-        .toast {
-            position: fixed; bottom: 30px; left: 50%;
-            transform: translateX(-50%) translateY(80px);
-            background: rgba(15,23,42,0.95); backdrop-filter: blur(12px);
-            padding: 12px 24px; border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.08); color: #e8edf5;
-            font-size: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            opacity: 0; transition: all 0.4s cubic-bezier(0.22,1,0.36,1);
-            pointer-events: none; z-index: 999; max-width: 90%; text-align: center;
-        }
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .toast.error { border-color: rgba(248,113,113,0.3); }
-        .toast.success { border-color: rgba(74,222,128,0.3); }
+  /* 设备卡片 */
+  .card { background:#fff; border-radius:10px; padding:14px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+  .card .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .card .name { font-size:15px; font-weight:600; }
+  .card .mac { font-size:11px; color:#757575; margin-bottom:10px; }
+  .card .sensors { display:flex; justify-content:space-around; }
+  .sensor-item { text-align:center; }
+  .sensor-item .val { font-size:20px; font-weight:700; }
+  .sensor-item .lbl { font-size:11px; color:#757575; }
+  .rssi-badge { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+  .rssi-good { background:#E8F5E9; color:#2E7D32; }
+  .rssi-mid { background:#FFF8E1; color:#F57F17; }
+  .rssi-poor { background:#FFEBEE; color:#C62828; }
 
-        @media (max-width:400px) {
-            .main-card .temp-value { font-size: 56px; }
-            .main-card .temp-unit { font-size: 22px; }
-            .metrics { grid-template-columns: repeat(3,1fr); gap:6px; }
-            .metric-item .value { font-size:17px; }
-            .history-item { font-size:12px; grid-template-columns:70px 1fr 1fr 1fr 40px; padding:6px 8px; }
-            .actions .btn { font-size:13px; padding:12px 12px; min-width:80px; }
-            .config-row input { min-width:120px; }
-            .log-box { max-height:160px; font-size:11px; }
-        }
-        @media (min-width:600px) {
-            body { padding:30px 20px; }
-            .main-card .temp-value { font-size:88px; }
-        }
-        .hidden { display:none !important; }
-    </style>
+  /* 扫描按钮 */
+  .fab { position:fixed; bottom:76px; right:16px; width:56px; height:56px; border-radius:50%; border:none; color:#fff; font-size:26px; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:5; }
+  .fab.start { background:#1976D2; }
+  .fab.stop { background:#E53935; }
+
+  /* 图表控制栏 */
+  .chart-ctrl { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; align-items:center; }
+  .chip { padding:5px 12px; border-radius:14px; border:1px solid #bdbdbd; background:#fff; font-size:11px; cursor:pointer; white-space:nowrap; }
+  .chip.selected { background:#1976D2; color:#fff; border-color:#1976D2; }
+  .chart-mode-row { display:flex; justify-content:center; gap:6px; margin-bottom:6px; }
+  .reset-btn { margin-left:auto; padding:5px 10px; border-radius:14px; border:1px solid #E53935; background:#fff; color:#E53935; font-size:11px; cursor:pointer; }
+  .chart-wrap { position:relative; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+  canvas { display:block; width:100%; height:280px; touch-action:none; }
+
+  /* 设置面板 */
+  .setting-group { background:#fff; border-radius:10px; padding:14px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+  .setting-group label { font-size:13px; color:#757575; display:block; margin-bottom:4px; }
+  .setting-group input[type=text] { width:100%; border:1px solid #e0e0e0; border-radius:6px; padding:8px; font-size:13px; font-family:monospace; }
+  .setting-row { display:flex; align-items:center; justify-content:space-between; margin:8px 0; }
+  .setting-row span { font-size:14px; }
+  .btn { padding:10px 20px; border-radius:8px; border:none; font-size:14px; cursor:pointer; width:100%; margin-top:6px; font-weight:600; }
+  .btn-primary { background:#1976D2; color:#fff; }
+  .btn-outline { background:#fff; color:#E53935; border:1px solid #E53935; }
+  .btn-sm { padding:5px 12px; font-size:11px; width:auto; }
+
+  /* 调试面板 */
+  .debug-overlay { position:fixed; bottom:60px; left:0; right:0; background:rgba(33,33,33,0.95); color:#E0E0E0; max-height:220px; overflow-y:auto; font-size:11px; font-family:monospace; z-index:8; padding:8px; display:none; }
+  .debug-overlay.visible { display:block; }
+  .debug-entry { border-bottom:1px solid #424242; padding:4px 0; }
+  .debug-entry .ok { color:#4CAF50; }
+  .debug-entry .fail { color:#FF5252; }
+  .debug-entry .hex { color:#81D4FA; font-size:9px; word-break:break-all; }
+  .debug-entry button { background:none; border:none; color:#FFD54F; font-size:9px; cursor:pointer; padding:0; }
+
+  /* 空状态 */
+  .empty { text-align:center; padding:40px 20px; color:#9e9e9e; }
+  .empty .icon { font-size:48px; margin-bottom:12px; }
+
+  /* 提示框 */
+  .tooltip-overlay { position:absolute; pointer-events:none; display:none; z-index:2; }
+  .tooltip-box { background:rgba(33,33,33,0.9); color:#fff; border-radius:6px; padding:6px 10px; font-size:12px; white-space:nowrap; }
+</style>
 </head>
 <body>
-    <div id="app">
-        <header class="app-header">
-            <span class="app-title">🌡️ BLE 监测</span>
-            <div class="status-badge">
-                <span class="status-dot" id="statusDot"></span>
-                <span id="statusText">未连接</span>
-                <span style="opacity:0.3;margin:0 2px;">|</span>
-                <span>📋 <span class="record-count" id="recordCount">0</span></span>
-            </div>
-        </header>
 
-        <!-- 配置 -->
-        <div class="config-row">
-            <label for="uuidInput">目标服务 UUID</label>
-            <input type="text" id="uuidInput" value="00000318-0000-1000-8000-00805f9b34fb" spellcheck="false">
-            <div class="hint">使用该服务作为 filter，只接收匹配的广播</div>
-        </div>
-        <div class="config-row">
-            <div class="checkbox-wrap">
-                <input type="checkbox" id="showAllCheck">
-                <label for="showAllCheck">显示所有广播（调试）</label>
-            </div>
-            <div class="hint">开启后改为 acceptAll，打印所有广播（可能刷屏）</div>
-        </div>
+<!-- 顶部栏 -->
+<div class="topbar">
+  <div class="status-dot off" id="statusDot"></div>
+  <h1>温湿度扫描仪</h1>
+  <button class="debug-btn" id="debugToggle" title="调试控制台">&#128030;</button>
+</div>
 
-        <!-- 主卡片 -->
-        <section class="main-card">
-            <div class="temp-wrap">
-                <span class="temp-value" id="tempDisplay">--</span>
-                <span class="temp-unit">°C</span>
-            </div>
-            <div class="temp-label" id="tempLabel">等待数据</div>
-            <div class="metrics">
-                <div class="metric-item humidity">
-                    <div class="label">💧 湿度</div>
-                    <div class="value" id="humidDisplay">-- <span class="sub">%</span></div>
-                </div>
-                <div class="metric-item battery">
-                    <div class="label">🔋 电量</div>
-                    <div class="value" id="battDisplay">-- <span class="sub">%</span></div>
-                </div>
-                <div class="metric-item">
-                    <div class="label">📶 RSSI</div>
-                    <div class="value rssi-val" id="rssiDisplay">-- <span class="sub">dBm</span></div>
-                </div>
-            </div>
-            <div class="no-data" id="noDataMsg">
-                <div class="icon">📡</div>
-                <div>点击「开始扫描」接收广播</div>
-            </div>
-        </section>
+<!-- Tab 内容 -->
+<div class="content" id="content">
 
-        <!-- 历史 -->
-        <section class="history-section">
-            <div class="history-header">
-                <h3>📜 历史记录</h3>
-                <button class="clear-btn" id="clearHistoryBtn">清空</button>
-            </div>
-            <div class="history-list" id="historyList">
-                <div class="history-empty" id="historyEmpty">
-                    <div class="icon">📭</div>
-                    <div>暂无记录</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 日志 -->
-        <section class="log-section">
-            <div class="log-header">
-                <span>📋 调试日志</span>
-                <button class="log-clear" id="clearLogBtn">清空</button>
-            </div>
-            <div class="log-box" id="logBox">
-                <div class="log-entry"><span class="log-time">[系统]</span><span class="log-msg">就绪，等待扫描...</span></div>
-            </div>
-        </section>
-
-        <!-- 按钮 -->
-        <div class="actions">
-            <button class="btn btn-primary" id="scanBtn">
-                <span class="icon">▶</span> 开始扫描
-            </button>
-            <button class="btn btn-secondary" id="exportBtn">
-                <span class="icon">📥</span> 导出 CSV
-            </button>
-        </div>
-
-        <div class="toast" id="toast"></div>
+  <!-- Tab 1: 实时扫描 -->
+  <div class="tab-page active" id="tabScan">
+    <div class="count-bar">
+      <span>&#128246;</span>
+      <span class="count" id="deviceCount">目标 Beacon 0 台</span>
     </div>
+    <div class="filter-bar">
+      <input type="text" id="macInput" placeholder="输入目标 MAC（如 52:07:10:25:01:0F）" autocomplete="off">
+      <label class="toggle"><input type="checkbox" id="macToggle" checked><span class="slider"></span></label>
+    </div>
+    <div id="deviceList"></div>
+  </div>
 
-    <script>
-        // ================================================================
-        //  优化版 – 默认使用 filter 方式，更可靠
-        // ================================================================
-        let isScanning = false;
-        let records = [];
-        let db = null;
-        let lastData = null;
+  <!-- Tab 2: 图表 -->
+  <div class="tab-page" id="tabChart">
+    <div class="chart-ctrl" id="timeChips"></div>
+    <div class="chart-mode-row" id="modeChips"></div>
+    <div class="chart-wrap" id="chartWrap">
+      <canvas id="chartCanvas"></canvas>
+    </div>
+    <div style="text-align:center; padding:8px; font-size:11px; color:#757575;">
+      <span style="color:#E53935;">&#9632; 温度(°C)</span>
+      <span style="margin-left:16px; color:#00897B;">&#9632; 湿度(%)</span>
+    </div>
+  </div>
 
-        const $ = id => document.getElementById(id);
-        const statusDot = $('statusDot');
-        const statusText = $('statusText');
-        const recordCount = $('recordCount');
-        const tempDisplay = $('tempDisplay');
-        const tempLabel = $('tempLabel');
-        const humidDisplay = $('humidDisplay');
-        const battDisplay = $('battDisplay');
-        const rssiDisplay = $('rssiDisplay');
-        const noDataMsg = $('noDataMsg');
-        const historyList = $('historyList');
-        const historyEmpty = $('historyEmpty');
-        const scanBtn = $('scanBtn');
-        const exportBtn = $('exportBtn');
-        const clearHistoryBtn = $('clearHistoryBtn');
-        const toast = $('toast');
-        const uuidInput = $('uuidInput');
-        const showAllCheck = $('showAllCheck');
-        const logBox = $('logBox');
-        const clearLogBtn = $('clearLogBtn');
+  <!-- Tab 3: 设置 -->
+  <div class="tab-page" id="tabSettings">
+    <div class="setting-group">
+      <label>目标 iBeacon UUID</label>
+      <input type="text" id="uuidInput" autocomplete="off">
+      <button class="btn btn-sm" id="uuidReset" style="margin-top:6px;">恢复默认</button>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>UUID 过滤</span><label class="toggle"><input type="checkbox" id="uuidFilterToggle" checked><span class="slider"></span></label></div>
+      <div class="setting-row"><span>MAC 过滤</span><label class="toggle"><input type="checkbox" id="macFilterToggle" checked><span class="slider"></span></label></div>
+      <div class="setting-row">
+        <span>MAC 地址</span>
+        <input type="text" id="macFilterInput" placeholder="如 52:07:10:25:01:0F" style="width:200px; font-family:monospace; font-size:12px; padding:4px 8px; border:1px solid #e0e0e0; border-radius:4px;" autocomplete="off">
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>数据条数</span><span id="dataCount">0</span></div>
+      <button class="btn btn-primary" id="exportBtn">导出 CSV</button>
+      <button class="btn btn-outline" id="clearBtn">清除数据</button>
+    </div>
+  </div>
+</div>
 
-        const DB_NAME = 'db-ble-monitor-db';
-        const STORE_NAME = 'store-records';
-        const MAX_HISTORY_DISPLAY = 200;
+<!-- 浮动按钮 -->
+<button class="fab start" id="scanBtn">&#9654;</button>
 
-        // ----- 日志 -----
-        function log(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            const cls = type === 'warn' ? 'warn' : type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'debug' ? 'debug' : '';
-            entry.innerHTML = `<span class="log-time">[${time}]</span><span class="log-msg ${cls}">${msg}</span>`;
-            logBox.appendChild(entry);
-            logBox.scrollTop = logBox.scrollHeight;
-            while (logBox.children.length > 400) logBox.removeChild(logBox.firstChild);
-            console.log(`[BLE] ${msg}`);
+<!-- 调试面板 -->
+<div class="debug-overlay" id="debugPanel"></div>
+
+<!-- 底部导航栏 -->
+<div class="navbar">
+  <button class="nav-item active" data-tab="scan"><span class="icon">&#128268;</span>实时</button>
+  <button class="nav-item" data-tab="chart"><span class="icon">&#128200;</span>图表</button>
+  <button class="nav-item" data-tab="settings"><span class="icon">&#9881;</span>设置</button>
+</div>
+
+<!-- 确认对话框 -->
+<div id="confirmBox" style="display:none; position:fixed; top:0;left:0;right:0;bottom:0; background:rgba(0,0,0,0.5); z-index:100; justify-content:center; align-items:center;">
+  <div style="background:#fff; border-radius:12px; padding:20px; margin:0 32px; text-align:center;">
+    <p style="margin-bottom:16px; font-size:15px;">确定要清除所有数据吗？此操作不可撤销。</p>
+    <div style="display:flex; gap:12px;">
+      <button id="confirmOk" class="btn btn-outline" style="flex:1;">确定清除</button>
+      <button id="confirmCancel" class="btn btn-primary" style="flex:1; background:#757575;">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========================== 配置 ==========================
+const DEFAULT_UUID = 'FDA50693-A4E2-4FB1-AFCF-C6EB07647825';
+const MAX_ENTRIES = 50000;
+const DEVICE_TIMEOUT = 8000;
+
+function loadCfg(key, def) {
+  try { const v = localStorage.getItem(key); return v !== null ? v : def; } catch(e) { return def; }
+}
+function saveCfg(key, val) {
+  try { localStorage.setItem(key, val); } catch(e) {}
+}
+
+let cfg = {
+  uuid: loadCfg('target_uuid', DEFAULT_UUID),
+  mac: loadCfg('target_mac', ''),
+  macFilter: loadCfg('mac_filter_enabled', 'true') === 'true',
+  uuidFilter: loadCfg('uuid_filter_enabled', 'true') === 'true',
+  debug: loadCfg('debug_visible', 'false') === 'true',
+};
+
+// ========================== IndexedDB ==========================
+const DB_NAME = 'beacon_scanner';
+const DB_VER = 1;
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = (e) => { e.target.result.createObjectStore('logs', { keyPath: 'ts' }); };
+    req.onsuccess = (e) => { db = e.target.result; resolve(); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbPut(entry) {
+  if (!db) return;
+  const tx = db.transaction('logs', 'readwrite');
+  tx.objectStore('logs').put(entry);
+}
+
+function dbGetAll() {
+  return new Promise((resolve) => {
+    if (!db) { resolve([]); return; }
+    const tx = db.transaction('logs', 'readonly');
+    const req = tx.objectStore('logs').getAll();
+    req.onsuccess = () => resolve(req.result || []);
+  });
+}
+
+function dbClear() {
+  return new Promise((resolve) => {
+    if (!db) { resolve(); return; }
+    const tx = db.transaction('logs', 'readwrite');
+    tx.objectStore('logs').clear();
+    tx.oncomplete = resolve;
+  });
+}
+
+async function dbCount() {
+  if (!db) return 0;
+  const tx = db.transaction('logs', 'readonly');
+  const req = tx.objectStore('logs').count();
+  return new Promise(r => { req.onsuccess = () => r(req.result); });
+}
+
+// ========================== 状态 ==========================
+let scanBluetooth = null;
+let isScanning = false;
+let devices = {};           // { mac: { name,mac,rssi,ts,temperature,humidity,battery } }
+let logEntries = [];        // [{ ts, t, h, b, r, m }]
+let debugLog = [];          // [{ ts,mac,rssi,hex,uuidOk,hasSensor,temp,hum,bat }]
+let lastSensorCache = {};   // { mac: { temperature, humidity, battery } }
+let currentTab = 'scan';
+let debugVisible = cfg.debug;
+
+// 图表状态
+let viewStart, viewEnd;
+let selectedRange = 5 * 60 * 1000;
+let chartMode = 'both'; // 'temp' | 'hum' | 'both'
+
+// ========================== UUID 工具 ==========================
+function uuidToBytes(uuid) {
+  const hex = uuid.replace(/-/g, '');
+  if (hex.length !== 32) return null;
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) {
+    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function findPattern(source, pattern) {
+  if (!pattern || pattern.length === 0) return -1;
+  for (let i = 0; i <= source.length - pattern.length; i++) {
+    let match = true;
+    for (let j = 0; j < pattern.length; j++) {
+      if (source[i + j] !== pattern[j]) { match = false; break; }
+    }
+    if (match) return i;
+  }
+  return -1;
+}
+
+// ========================== 解析 ==========================
+function parseSensorBytes(data, rssi, mac, name) {
+  if (!data || data.byteLength < 6) return null;
+  const bytes = new Uint8Array(data.buffer, data.byteOffset, 6);
+  const sign = bytes[0];
+  const tInt = bytes[1];
+  const tDec = bytes[2];
+  const hInt = bytes[3];
+  const hDec = bytes[4];
+  const battery = bytes[5];
+
+  let temp = tInt + tDec / 100;
+  if (sign === 0x01) temp = -temp;
+  const hum = hInt + hDec / 100;
+
+  if (temp < -50 || temp > 90) return null;
+  if (hum < 0 || hum > 100) return null;
+  if (battery > 100) return null;
+
+  return { temperature: temp, humidity: hum, battery, rssi, mac, name };
+}
+
+function dataViewToHex(dv) {
+  if (!dv) return '';
+  const bytes = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+}
+
+function handleAdvertisement(event) {
+  const dev = event.device;
+  const mac = (dev.id || '').toUpperCase();
+  const name = event.deviceName || dev.name || '未知设备';
+  const rssi = event.rssi;
+
+  // 原始 hex dump
+  let rawHex = '';
+  if (event.manufacturerData) {
+    for (const [key, dv] of event.manufacturerData) {
+      rawHex += `[MFG:${key.toString(16).toUpperCase()}] ${dataViewToHex(dv)} `;
+    }
+  }
+  if (event.serviceData) {
+    for (const [key, dv] of event.serviceData) {
+      rawHex += `[SVC:${key.toUpperCase()}] ${dataViewToHex(dv)} `;
+    }
+  }
+  rawHex = rawHex.trim();
+
+  // MAC 过滤
+  const filterMac = cfg.macFilter ? cfg.mac.trim().replace(/[:\-]/g, '').toUpperCase() : null;
+  if (filterMac && mac.replace(/:/g, '') !== filterMac) return;
+
+  // UUID 校验
+  let uuidOk = false;
+  if (cfg.uuidFilter) {
+    const targetBytes = uuidToBytes(cfg.uuid);
+    if (targetBytes && event.manufacturerData) {
+      for (const [key, dv] of event.manufacturerData) {
+        const bytes = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+        if (findPattern(bytes, targetBytes) >= 0) { uuidOk = true; break; }
+      }
+    }
+    if (!uuidOk) {
+      // 仍记录调试日志但跳过
+      addDebug(mac, rssi, rawHex, false, false, null, null, null);
+      return;
+    }
+  } else {
+    uuidOk = true; // 未启用过滤，视作匹配
+  }
+
+  // 提取传感器数据
+  let temp = null, hum = null, battery = null, hasSensor = false;
+  const svcUUID = '00000318-0000-1000-8000-00805f9b34fb';
+  if (event.serviceData && event.serviceData.has(svcUUID)) {
+    const sd = event.serviceData.get(svcUUID);
+    if (sd && sd.byteLength >= 6) {
+      const parsed = parseSensorBytes(sd, rssi, mac, name);
+      if (parsed) {
+        temp = parsed.temperature;
+        hum = parsed.humidity;
+        battery = parsed.battery;
+        hasSensor = true;
+        lastSensorCache[mac] = { temperature: temp, humidity: hum, battery };
+      }
+    }
+  }
+
+  // 无传感器数据时复用上次
+  if (!hasSensor && lastSensorCache[mac]) {
+    const last = lastSensorCache[mac];
+    temp = last.temperature;
+    hum = last.humidity;
+    battery = last.battery;
+  } else if (!hasSensor) {
+    // 首次尚未收到传感器包，仍显示设备
+  }
+
+  // 更新设备列表
+  devices[mac] = { name, mac, rssi, ts: Date.now(), temperature: temp, humidity: hum, battery };
+
+  // 调试日志
+  addDebug(mac, rssi, rawHex, uuidOk, hasSensor, temp, hum, battery);
+
+  // 记录到数据库
+  if (hasSensor) {
+    const entry = { ts: Date.now(), t: temp, h: hum, b: battery, r: rssi, m: mac };
+    logEntries.push(entry);
+    if (logEntries.length > MAX_ENTRIES) logEntries.shift();
+    dbPut(entry);
+  }
+
+  renderDevices();
+}
+
+function addDebug(mac, rssi, hex, uuidOk, hasSensor, temp, hum, bat) {
+  debugLog.push({ ts: Date.now(), mac, rssi, hex, uuidOk, hasSensor, temp, hum, bat });
+  if (debugLog.length > 200) debugLog.shift();
+  renderDebug();
+}
+
+// ========================== 扫描 ==========================
+async function startScan() {
+  if (!navigator.bluetooth) {
+    alert('此浏览器不支持 Web Bluetooth API\n请使用 Chrome (桌面或 Android)');
+    return false;
+  }
+  try {
+    scanBluetooth = await navigator.bluetooth.requestLEScan({
+      acceptAllAdvertisements: true,
+      keepRepeatedDevices: true,
+    });
+    scanBluetooth.addEventListener('advertisementreceived', handleAdvertisement);
+    isScanning = true;
+    updateScanUI();
+    return true;
+  } catch (e) {
+    if (e.name === 'NotFoundError' && e.message.includes('cancelled')) {
+      // 用户取消，不算错误
+      return false;
+    }
+    alert('扫描启动失败: ' + e.message);
+    return false;
+  }
+}
+
+function stopScan() {
+  if (scanBluetooth) {
+    scanBluetooth.abort();
+    scanBluetooth = null;
+  }
+  isScanning = false;
+  updateScanUI();
+}
+
+// ========================== UI 更新 ==========================
+function updateScanUI() {
+  const btn = document.getElementById('scanBtn');
+  const dot = document.getElementById('statusDot');
+  if (isScanning) {
+    btn.className = 'fab stop';
+    btn.innerHTML = '&#9632;';
+    dot.className = 'status-dot on';
+  } else {
+    btn.className = 'fab start';
+    btn.innerHTML = '&#9654;';
+    dot.className = 'status-dot off';
+  }
+}
+
+function renderDevices() {
+  const list = document.getElementById('deviceList');
+  const now = Date.now();
+  const arr = Object.values(devices).filter(d => now - d.ts < DEVICE_TIMEOUT);
+
+  // 清理过期
+  const newDevs = {};
+  arr.forEach(d => { newDevs[d.mac] = d; });
+  devices = newDevs;
+
+  document.getElementById('deviceCount').textContent = `目标 Beacon ${arr.length} 台`;
+
+  if (arr.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="icon">&#128268;</div><p>${isScanning ? '正在扫描附近的 BLE 设备...' : '点击下方按钮开始扫描'}</p></div>`;
+    return;
+  }
+
+  list.innerHTML = arr.map(d => {
+    const rssiCls = d.rssi > -60 ? 'rssi-good' : d.rssi > -80 ? 'rssi-mid' : 'rssi-poor';
+    const rssiLabel = d.rssi > -60 ? '强' : d.rssi > -80 ? '中' : '弱';
+    const temp = d.temperature != null ? d.temperature.toFixed(2) + '°C' : '--';
+    const hum = d.humidity != null ? d.humidity.toFixed(2) + '%' : '--';
+    const bat = d.battery != null ? d.battery + '%' : '--';
+    const tempColor = d.temperature != null ? (d.temperature > 30 ? '#E53935' : d.temperature < 5 ? '#1565C0' : '#00897B') : '#757575';
+    return `<div class="card">
+      <div class="header">
+        <span class="name">${esc(d.name)}</span>
+        <span class="rssi-badge ${rssiCls}">${rssiLabel} ${d.rssi}dBm</span>
+      </div>
+      <div class="mac">${esc(d.mac)}</div>
+      <div class="sensors">
+        <div class="sensor-item"><div class="val" style="color:${tempColor}">${temp}</div><div class="lbl">温度</div></div>
+        <div class="sensor-item"><div class="val" style="color:#00897B">${hum}</div><div class="lbl">湿度</div></div>
+        <div class="sensor-item"><div class="val" style="color:#F57F17">${bat}</div><div class="lbl">电量</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDebug() {
+  const panel = document.getElementById('debugPanel');
+  if (!debugVisible) return;
+  panel.innerHTML = debugLog.slice().reverse().map(e => {
+    const uidCls = e.uuidOk ? 'ok' : 'fail';
+    const uidTxt = e.uuidOk ? '✓UUID' : '✗UUID';
+    const sensorTxt = e.hasSensor ? `T:${e.temp?.toFixed(1) ?? '-'} H:${e.hum?.toFixed(1) ?? '-'} B:${e.bat ?? '-'}` : '无传感器';
+    return `<div class="debug-entry">
+      <span>${fmtTime(e.ts)}</span> <span>${esc(e.mac)}</span> RSSI:${e.rssi}
+      <span class="${uidCls}">${uidTxt}</span> <span>${sensorTxt}</span>
+      <br><span class="hex">${esc(e.hex)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ========================== 图表 ==========================
+const TIME_RANGES = [
+  [5 * 60 * 1000, '5分钟'],
+  [15 * 60 * 1000, '15分钟'],
+  [30 * 60 * 1000, '30分钟'],
+  [60 * 60 * 1000, '1小时'],
+  [0, '全部'],
+];
+
+function initChartControls() {
+  document.getElementById('timeChips').innerHTML = TIME_RANGES.map(([r, l]) =>
+    `<button class="chip${selectedRange === r ? ' selected' : ''}" data-range="${r}">${l}</button>`
+  ).join('');
+  document.getElementById('timeChips').onclick = (e) => {
+    if (e.target.classList.contains('chip')) {
+      selectedRange = parseInt(e.target.dataset.range);
+      resetViewport();
+      initChartControls();
+      drawChart();
+    }
+  };
+
+  document.getElementById('modeChips').innerHTML =
+    `<button class="chip${chartMode === 'temp' ? ' selected' : ''}" data-mode="temp">温度</button>
+     <button class="chip${chartMode === 'hum' ? ' selected' : ''}" data-mode="hum">湿度</button>
+     <button class="chip${chartMode === 'both' ? ' selected' : ''}" data-mode="both">全部</button>
+     <button class="reset-btn">重置</button>`;
+  document.getElementById('modeChips').onclick = (e) => {
+    if (e.target.dataset.mode) {
+      chartMode = e.target.dataset.mode;
+      initChartControls();
+      drawChart();
+    } else if (e.target.classList.contains('reset-btn')) {
+      resetViewport();
+      drawChart();
+    }
+  };
+}
+
+function resetViewport() {
+  const now = Date.now();
+  viewStart = selectedRange === 0 ? (logEntries[0]?.ts ?? now) : now - selectedRange;
+  viewEnd = now;
+}
+
+function drawChart() {
+  const canvas = document.getElementById('chartCanvas');
+  const wrap = document.getElementById('chartWrap');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = wrap.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 280 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '280px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = 280;
+  const padL = 60, padR = (chartMode === 'both' ? 50 : 16), padT = 8, padB = 36;
+  const cw = W - padL - padR, ch = H - padT - padB;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // 过滤可见数据
+  const now = Date.now();
+  if (viewEnd === undefined) resetViewport();
+  let data = logEntries.filter(e => e.ts >= viewStart && e.ts <= viewEnd).sort((a, b) => a.ts - b.ts);
+
+  if (data.length === 0) {
+    ctx.fillStyle = '#9e9e9e';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', W/2, H/2);
+    return;
+  }
+
+  const showTemp = chartMode === 'temp' || chartMode === 'both';
+  const showHum = chartMode === 'hum' || chartMode === 'both';
+
+  // Y 轴范围
+  let tempMin = 0, tempMax = 50, humMin = 0, humMax = 100;
+  if (showTemp) {
+    const temps = data.map(d => d.t).filter(t => t != null);
+    if (temps.length > 0) { tempMin = Math.min(...temps) - 2; tempMax = Math.max(...temps) + 2; }
+  }
+  if (showHum) {
+    const hums = data.map(d => d.h).filter(h => h != null);
+    if (hums.length > 0) { humMin = Math.min(...hums) - 2; humMax = Math.max(...hums) + 2; }
+  }
+
+  // 网格
+  const gridLines = 5;
+  ctx.strokeStyle = '#E0E0E0';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padT + ch * i / gridLines;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+  }
+
+  // Y 轴标签
+  ctx.font = '10px sans-serif';
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padT + ch * i / gridLines;
+    if (showTemp) {
+      const v = tempMax - (tempMax - tempMin) * i / gridLines;
+      ctx.fillStyle = '#E53935';
+      ctx.textAlign = 'right';
+      ctx.fillText(v.toFixed(1) + '°', padL - 6, y + 3);
+    }
+    if (showHum && chartMode === 'both') {
+      const v = humMax - (humMax - humMin) * i / gridLines;
+      ctx.fillStyle = '#00897B';
+      ctx.textAlign = 'left';
+      ctx.fillText(v.toFixed(0) + '%', W - padR + 6, y + 3);
+    }
+  }
+
+  // X 轴标签
+  ctx.fillStyle = '#757575';
+  ctx.textAlign = 'center';
+  ctx.font = '10px sans-serif';
+  const timeRange = viewEnd - viewStart;
+  for (let i = 0; i <= 4; i++) {
+    const ts = viewStart + timeRange * i / 4;
+    const x = padL + cw * i / 4;
+    const d = new Date(ts);
+    const txt = d.getHours().toString().padStart(2,'0') + ':' +
+                d.getMinutes().toString().padStart(2,'0') + ':' +
+                d.getSeconds().toString().padStart(2,'0');
+    ctx.fillText(txt, x, H - 4);
+  }
+
+  // 坐标转换
+  const toX = (ts) => padL + Math.max(0, Math.min(1, (ts - viewStart) / timeRange)) * cw;
+  const toTempY = (v) => padT + (1 - (v - tempMin) / (tempMax - tempMin)) * ch;
+  const toHumY = (v) => padT + (1 - (v - humMin) / (humMax - humMin)) * ch;
+
+  // 温度线
+  if (showTemp) {
+    ctx.strokeStyle = '#E53935';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    let first = true;
+    data.forEach(d => {
+      if (d.t == null) return;
+      const x = toX(d.ts), y = toTempY(d.t);
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    data.forEach(d => {
+      if (d.t == null) return;
+      ctx.fillStyle = '#E53935';
+      ctx.beginPath(); ctx.arc(toX(d.ts), toTempY(d.t), 3, 0, Math.PI*2); ctx.fill();
+    });
+  }
+
+  // 湿度线
+  if (showHum) {
+    ctx.strokeStyle = '#00897B';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    let first = true;
+    data.forEach(d => {
+      if (d.h == null) return;
+      const x = toX(d.ts), y = toHumY(d.h);
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    data.forEach(d => {
+      if (d.h == null) return;
+      ctx.fillStyle = '#00897B';
+      ctx.beginPath(); ctx.arc(toX(d.ts), toHumY(d.h), 3, 0, Math.PI*2); ctx.fill();
+    });
+  }
+
+  // 保存绘图元数据供触摸使用
+  canvas._chartMeta = { data, showTemp, showHum, tempMin, tempMax, humMin, humMax, padL, padR, padT, padB, cw, ch, timeRange };
+}
+
+// ========================== 图表手势 ==========================
+function initChartGestures() {
+  const canvas = document.getElementById('chartCanvas');
+  let baseStart, baseEnd, focalRatio;
+  let gActive = false;
+  let tapStart = null;
+  let moved = false;
+
+  canvas.addEventListener('touchstart', (e) => {
+    if (!canvas._chartMeta) return;
+    const meta = canvas._chartMeta;
+    if (e.touches.length === 1) {
+      tapStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+      moved = false;
+    } else if (e.touches.length >= 2 && !gActive) {
+      // 开始手势：锁定初始视口和焦点
+      baseStart = viewStart;
+      baseEnd = viewEnd;
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const rect = canvas.getBoundingClientRect();
+      focalRatio = Math.max(0, Math.min(1, (cx - rect.left - meta.padL) / meta.cw));
+      gActive = true;
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (!canvas._chartMeta) return;
+    const meta = canvas._chartMeta;
+    if (e.touches.length === 1 && tapStart) {
+      const dx = e.touches[0].clientX - tapStart.x;
+      if (Math.abs(dx) > 5) moved = true;
+      if (moved) {
+        const panMs = dx * (meta.timeRange / meta.cw);
+        const dur = viewEnd - viewStart;
+        const s = Math.max(logEntries[0]?.ts ?? 0 - dur, Math.min(viewStart - panMs, (logEntries[logEntries.length-1]?.ts ?? Date.now())));
+        viewStart = s;
+        viewEnd = s + dur;
+        tapStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: tapStart.t };
+        drawChart();
+      }
+    } else if (e.touches.length >= 2 && gActive) {
+      const x1 = e.touches[0].clientX, y1 = e.touches[0].clientY;
+      const x2 = e.touches[1].clientX, y2 = e.touches[1].clientY;
+      const curDist = Math.hypot(x2 - x1, y2 - y1);
+      if (!gActive._initDist) {
+        gActive._initDist = curDist;
+        gActive._initPanX = (x1 + x2) / 2;
+        return;
+      }
+      const zoom = curDist / gActive._initDist;
+      const panPx = ((x1 + x2) / 2) - gActive._initPanX;
+
+      const baseRange = baseEnd - baseStart;
+      let newRange = baseRange / zoom;
+      newRange = Math.max(10000, Math.min(86400000, newRange));
+      let newStart = baseStart + (baseRange - newRange) * focalRatio;
+      newStart -= panPx * baseRange / meta.cw;
+      newStart = Math.max((logEntries[0]?.ts ?? 0) - newRange, Math.min(newStart, (logEntries[logEntries.length-1]?.ts ?? Date.now())));
+      viewStart = newStart;
+      viewEnd = newStart + newRange;
+      drawChart();
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    if (gActive) {
+      gActive._initDist = undefined;
+      gActive._initPanX = undefined;
+      gActive = false;
+      return;
+    }
+    if (!moved && tapStart && Date.now() - tapStart.t < 250) {
+      // 点击 → 找最近数据点
+      const meta = canvas._chartMeta;
+      if (!meta) return;
+      const rect = canvas.getBoundingClientRect();
+      const tx = tapStart.x - rect.left;
+      if (tx >= meta.padL && tx <= canvas.width / (window.devicePixelRatio||1) - meta.padR) {
+        const tappedTs = viewStart + ((tx - meta.padL) / meta.cw) * meta.timeRange;
+        let nearest = null, minDist = Infinity;
+        meta.data.forEach(d => {
+          const dist = Math.abs(d.ts - tappedTs);
+          if (dist < minDist) { minDist = dist; nearest = d; }
+        });
+        if (nearest) {
+          const ratio = (nearest.ts - viewStart) / meta.timeRange;
+          const px = meta.padL + ratio * meta.cw;
+          showTooltip(nearest, px, tapStart.y - rect.top);
         }
-        function clearLog() { logBox.innerHTML = ''; log('日志已清空', 'info'); }
+      }
+    }
+    tapStart = null;
+  });
+}
 
-        // ----- IndexedDB -----
-        function openDB() {
-            return new Promise((resolve, reject) => {
-                const req = indexedDB.open(DB_NAME, 1);
-                req.onupgradeneeded = (e) => {
-                    const d = e.target.result;
-                    if (!d.objectStoreNames.contains(STORE_NAME)) {
-                        const store = d.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                        store.createIndex('time', 'time', { unique: false });
-                    }
-                };
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-        }
-        function saveRecord(db, record) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.add(record);
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-        }
-        function loadAllRecords(db) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const index = store.index('time');
-                const req = index.openCursor(null, 'prev');
-                const result = [];
-                req.onsuccess = (e) => {
-                    const cursor = e.target.result;
-                    if (cursor) { result.push(cursor.value); cursor.continue(); }
-                    else resolve(result);
-                };
-                req.onerror = () => reject(req.error);
-            });
-        }
-        function clearAllRecords(db) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.clear();
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
-            });
-        }
+function showTooltip(entry, px, py) {
+  const wrap = document.getElementById('chartWrap');
+  let tip = document.getElementById('tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'tooltip';
+    tip.className = 'tooltip-overlay';
+    wrap.appendChild(tip);
+  }
+  const lines = [fmtTime(entry.ts)];
+  if (chartMode === 'temp' || chartMode === 'both') lines.push(entry.t != null ? entry.t.toFixed(2) + '°C' : '--');
+  if (chartMode === 'hum' || chartMode === 'both') lines.push(entry.h != null ? entry.h.toFixed(2) + '%' : '--');
+  tip.innerHTML = `<div class="tooltip-box">${lines.join('<br>')}</div>`;
+  tip.style.display = 'block';
+  const boxW = 140;
+  const left = px + boxW + 16 > wrap.clientWidth ? px - boxW - 16 : px + 16;
+  tip.style.left = left + 'px';
+  tip.style.top = Math.max(0, Math.min(wrap.clientHeight - 60, py - 40)) + 'px';
 
-        // ----- 扫描控制 -----
-        async function startScan() {
-            if (!navigator.bluetooth || !navigator.bluetooth.requestLEScan) {
-                log('当前浏览器不支持 BLE 广播扫描', 'error');
-                showToast('⚠️ 浏览器不支持 BLE 广播', 'error');
-                return false;
-            }
-            const serviceUuid = uuidInput.value.trim();
-            if (!serviceUuid) {
-                log('请输入目标服务 UUID', 'warn');
-                showToast('⚠️ 请输入目标服务 UUID', 'error');
-                return false;
-            }
-            const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-            if (!uuidRegex.test(serviceUuid)) {
-                log(`UUID 格式错误: ${serviceUuid}`, 'error');
-                showToast('⚠️ UUID 格式错误', 'error');
-                return false;
-            }
+  setTimeout(() => { tip.style.display = 'none'; }, 3000);
+}
 
-            const showAll = showAllCheck.checked;
-            let scanOptions;
-            if (showAll) {
-                scanOptions = { acceptAllAdvertisements: true, keepRepeatedDevices: true };
-                log('模式: 显示所有广播 (acceptAll)', 'info');
-            } else {
-                scanOptions = { filters: [{ services: [serviceUuid] }], keepRepeatedDevices: true };
-                log(`模式: 过滤服务 ${serviceUuid}`, 'info');
-            }
+// ========================== CSV 导出 ==========================
+function exportCsv() {
+  if (logEntries.length === 0) { alert('暂无数据可导出'); return; }
+  const sorted = [...logEntries].sort((a, b) => a.ts - b.ts);
+  const bom = '﻿';
+  const header = 'datetime,temperature,humidity,battery,rssi,mac\n';
+  const rows = sorted.map(e =>
+    `${fmtTimeFull(e.ts)},${e.t != null ? e.t.toFixed(2) : ''},${e.h != null ? e.h.toFixed(2) : ''},${e.b ?? ''},${e.r},${e.m}`
+  ).join('\n');
+  const blob = new Blob([bom + header + rows], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `beacon_data_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-            try {
-                const scan = await navigator.bluetooth.requestLEScan(scanOptions);
-                isScanning = true;
-                updateScanUI(true);
-                log('✅ 扫描已启动', 'success');
-                showToast('✅ 扫描已启动', 'success');
-                navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisementReceived);
-                return true;
-            } catch (err) {
-                let msg = '扫描启动失败: ';
-                if (err.message?.includes('choosing')) msg += '用户取消';
-                else if (err.message?.includes('permission')) msg += '请允许蓝牙权限';
-                else msg += err.message || '未知错误';
-                log(msg, 'error');
-                showToast('⚠️ ' + msg, 'error');
-                updateScanUI(false);
-                return false;
-            }
-        }
+// ========================== 工具 ==========================
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtTime(ts) {
+  const d = new Date(ts);
+  return d.getHours().toString().padStart(2,'0') + ':' +
+         d.getMinutes().toString().padStart(2,'0') + ':' +
+         d.getSeconds().toString().padStart(2,'0');
+}
+function fmtTimeFull(ts) {
+  const d = new Date(ts);
+  return d.getFullYear() + '-' +
+    (d.getMonth()+1).toString().padStart(2,'0') + '-' +
+    d.getDate().toString().padStart(2,'0') + ' ' +
+    d.getHours().toString().padStart(2,'0') + ':' +
+    d.getMinutes().toString().padStart(2,'0') + ':' +
+    d.getSeconds().toString().padStart(2,'0');
+}
 
-        function stopScan() {
-            if (!isScanning) return;
-            try { navigator.bluetooth.stopLEScan(); } catch (e) {}
-            navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisementReceived);
-            isScanning = false;
-            updateScanUI(false);
-            log('扫描已停止', 'info');
-            showToast('⏹️ 扫描已停止', '');
-        }
+// ========================== UI 初始化 ==========================
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'scan') {
+    document.getElementById('scanBtn').style.display = '';
+    document.getElementById('debugPanel').classList.toggle('visible', debugVisible);
+  } else {
+    document.getElementById('scanBtn').style.display = 'none';
+    document.getElementById('debugPanel').classList.remove('visible');
+  }
+  if (tab === 'chart') { initChartControls(); drawChart(); }
+  if (tab === 'settings') { updateSettingsUI(); }
+}
 
-        // ----- 广播回调（详细打印所有数据）-----
-        function onAdvertisementReceived(event) {
-            const serviceUuid = uuidInput.value.trim();
-            const serviceData = event.serviceData;
-            const manufacturerData = event.manufacturerData;
-            const showAll = showAllCheck.checked;
+function updateSettingsUI() {
+  document.getElementById('uuidInput').value = cfg.uuid;
+  document.getElementById('uuidFilterToggle').checked = cfg.uuidFilter;
+  document.getElementById('macFilterToggle').checked = cfg.macFilter;
+  document.getElementById('macFilterInput').value = cfg.mac;
+  dbCount().then(c => { document.getElementById('dataCount').textContent = c + ' 条'; });
+}
 
-            // 打印完整事件信息（调试用）
-            log(`📡 收到广播, RSSI=${event.rssi}`, 'debug');
+async function init() {
+  await openDB();
+  logEntries = await dbGetAll();
+  // 从 logEntries 重建 lastSensorCache
+  logEntries.forEach(e => {
+    if (e.t != null && e.h != null) {
+      lastSensorCache[e.m] = { temperature: e.t, humidity: e.h, battery: e.b };
+    }
+  });
 
-            // 打印设备信息
-            const deviceName = event.name || '未知设备';
-            const deviceAddress = event.address || '未知地址';
-            log(`  设备: ${deviceName} (${deviceAddress})`, 'debug');
+  // 设置表单初始值
+  document.getElementById('macInput').value = cfg.mac;
+  document.getElementById('macToggle').checked = cfg.macFilter;
+  updateSettingsUI();
+  updateScanUI();
 
-            // 打印服务数据
-            if (serviceData) {
-                const keys = [];
-                for (const key of serviceData.keys()) keys.push(key);
-                log(`  服务数据 (${keys.length} 个): ${keys.join(', ')}`, 'debug');
-                // 打印每个服务的原始数据（最多16字节）
-                for (const key of keys) {
-                    const data = serviceData.get(key);
-                    if (data) {
-                        const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-                        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
-                        const preview = hex.length > 48 ? hex.substring(0, 48) + ' ...' : hex;
-                        log(`    ${key} (${bytes.length} 字节): ${preview}`, 'debug');
-                    }
-                }
-            } else {
-                log('  无服务数据 (serviceData 为空)', 'warn');
-            }
+  // 事件绑定
+  document.getElementById('scanBtn').onclick = async () => {
+    if (isScanning) stopScan(); else await startScan();
+  };
 
-            // 打印厂商数据
-            if (manufacturerData) {
-                const entries = [];
-                for (const [id, data] of manufacturerData.entries()) {
-                    const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-                    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
-                    entries.push(`0x${id.toString(16)}: ${hex}`);
-                }
-                log(`  厂商数据: ${entries.join('; ')}`, 'debug');
-            } else {
-                log('  无厂商数据 (manufacturerData 为空)', 'debug');
-            }
+  document.getElementById('macInput').oninput = function() {
+    cfg.mac = this.value.trim();
+    saveCfg('target_mac', cfg.mac);
+  };
+  document.getElementById('macToggle').onchange = function() {
+    cfg.macFilter = this.checked;
+    saveCfg('mac_filter_enabled', this.checked);
+  };
 
-            // 如果开启了显示所有广播，打印分隔线后返回
-            if (showAll) {
-                log('---', 'debug');
-                // 不进行匹配解析，只是打印
-                return;
-            }
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+  });
 
-            // 非显示所有模式：尝试匹配目标服务并解析
-            if (!serviceData) {
-                log('⚠️ 无服务数据，无法解析', 'warn');
-                return;
-            }
+  document.getElementById('debugToggle').onclick = () => {
+    debugVisible = !debugVisible;
+    cfg.debug = debugVisible;
+    saveCfg('debug_visible', debugVisible);
+    document.getElementById('debugToggle').classList.toggle('active', debugVisible);
+    if (currentTab === 'scan') {
+      document.getElementById('debugPanel').classList.toggle('visible', debugVisible);
+    }
+    renderDebug();
+  };
+  if (debugVisible) {
+    document.getElementById('debugToggle').classList.add('active');
+    document.getElementById('debugPanel').classList.add('visible');
+  }
 
-            let matchedKey = null;
-            let dataView = null;
-            for (const key of serviceData.keys()) {
-                if (key.toLowerCase() === serviceUuid.toLowerCase()) {
-                    matchedKey = key;
-                    dataView = serviceData.get(key);
-                    break;
-                }
-            }
+  document.getElementById('uuidInput').oninput = function() {
+    cfg.uuid = this.value.trim();
+    saveCfg('target_uuid', cfg.uuid);
+  };
+  document.getElementById('uuidReset').onclick = () => {
+    cfg.uuid = DEFAULT_UUID;
+    document.getElementById('uuidInput').value = DEFAULT_UUID;
+    saveCfg('target_uuid', DEFAULT_UUID);
+  };
+  document.getElementById('uuidFilterToggle').onchange = function() {
+    cfg.uuidFilter = this.checked;
+    saveCfg('uuid_filter_enabled', this.checked);
+  };
+  document.getElementById('macFilterToggle').onchange = function() {
+    cfg.macFilter = this.checked;
+    saveCfg('mac_filter_enabled', this.checked);
+  };
+  document.getElementById('macFilterInput').oninput = function() {
+    cfg.mac = this.value.trim();
+    saveCfg('target_mac', cfg.mac);
+  };
+  document.getElementById('exportBtn').onclick = exportCsv;
+  document.getElementById('clearBtn').onclick = () => {
+    document.getElementById('confirmBox').style.display = 'flex';
+  };
+  document.getElementById('confirmOk').onclick = async () => {
+    document.getElementById('confirmBox').style.display = 'none';
+    await dbClear();
+    logEntries = [];
+    lastSensorCache = {};
+    updateSettingsUI();
+    if (currentTab === 'chart') drawChart();
+  };
+  document.getElementById('confirmCancel').onclick = () => {
+    document.getElementById('confirmBox').style.display = 'none';
+  };
 
-            if (!dataView) {
-                log(`⚠️ 未找到匹配的服务 ${serviceUuid}`, 'warn');
-                return;
-            }
+  // 图表初始化
+  initChartControls();
+  initChartGestures();
+  resetViewport();
 
-            log(`✅ 匹配到服务 ${matchedKey}，长度 ${dataView.byteLength} 字节`, 'success');
-            const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
-            const hexData = Array.from(bytes).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
-            log(`  原始数据: ${hexData}`, 'debug');
+  // 实时轮询刷新图表 + 设备清理
+  setInterval(() => {
+    // 清理过期设备
+    const now = Date.now();
+    let changed = false;
+    for (const mac in devices) {
+      if (now - devices[mac].ts > DEVICE_TIMEOUT) { delete devices[mac]; changed = true; }
+    }
+    if (changed) renderDevices();
+    // 图表刷新
+    if (currentTab === 'chart') drawChart();
+  }, 2000);
 
-            if (bytes.length < 6) {
-                log(`  数据长度不足6字节 (${bytes.length})，无法解析`, 'warn');
-                return;
-            }
+  // 窗口大小改变时重绘
+  window.addEventListener('resize', () => { if (currentTab === 'chart') drawChart(); });
+}
 
-            // 解析温度、湿度、电量
-            const sign = bytes[0] === 0 ? 1 : -1;
-            const tempInt = bytes[1];
-            const tempFrac = bytes[2];
-            const temperature = sign * (tempInt + tempFrac / 100.0);
-
-            const humidInt = bytes[3];
-            const humidFrac = bytes[4];
-            const humidity = humidInt + humidFrac / 100.0;
-            const battery = bytes[5];
-
-            log(`  温度: ${temperature.toFixed(2)} °C`, 'success');
-            log(`  湿度: ${humidity.toFixed(1)} %`, 'success');
-            log(`  电量: ${battery} %`, 'info');
-            log('---', 'debug');
-
-            // 更新 UI 并存储
-            const record = {
-                time: new Date().toISOString(),
-                timestamp: Date.now(),
-                temperature: Math.round(temperature * 100) / 100,
-                humidity: Math.round(humidity * 100) / 100,
-                battery: Math.min(100, Math.max(0, battery)),
-                rssi: event.rssi !== undefined ? event.rssi : -100,
-            };
-            updateMainDisplay(record);
-            lastData = record;
-            if (db) {
-                saveRecord(db, record).then(() => refreshHistory())
-                                      .catch(err => log(`保存失败: ${err.message}`, 'error'));
-            } else {
-                records.unshift(record);
-                if (records.length > 1000) records.pop();
-                renderHistory();
-                updateRecordCount();
-            }
-        }
-
-        // ----- UI 更新 -----
-        function updateScanUI(scanning) {
-            if (scanning) {
-                statusDot.className = 'status-dot scanning';
-                statusText.textContent = '扫描中';
-                scanBtn.textContent = '⏹ 停止扫描';
-                scanBtn.className = 'btn btn-primary scanning';
-                noDataMsg.style.display = 'none';
-            } else {
-                statusDot.className = 'status-dot';
-                statusText.textContent = '已停止';
-                scanBtn.textContent = '▶ 开始扫描';
-                scanBtn.className = 'btn btn-primary';
-                if (!lastData) noDataMsg.style.display = 'block';
-            }
-        }
-
-        function updateMainDisplay(record) {
-            const t = record.temperature;
-            const h = record.humidity;
-            const b = record.battery;
-            const r = record.rssi;
-            tempDisplay.textContent = t.toFixed(1);
-            tempDisplay.className = 'temp-value';
-            if (t < 10) tempDisplay.classList.add('cold');
-            else if (t < 28) tempDisplay.classList.add('mild');
-            else tempDisplay.classList.add('hot');
-            tempLabel.textContent = t < 10 ? '❄️ 凉爽' : t < 28 ? '🌤️ 舒适' : '☀️ 温暖';
-            humidDisplay.innerHTML = h.toFixed(1) + ' <span class="sub">%</span>';
-            battDisplay.innerHTML = b + ' <span class="sub">%</span>';
-            rssiDisplay.innerHTML = r + ' <span class="sub">dBm</span>';
-            noDataMsg.style.display = 'none';
-        }
-
-        function updateRecordCount() { recordCount.textContent = records.length; }
-
-        // ----- 历史 -----
-        function renderHistory() {
-            const list = historyList;
-            const empty = historyEmpty;
-            if (records.length === 0) {
-                list.innerHTML = '';
-                list.appendChild(empty);
-                empty.style.display = 'block';
-                return;
-            }
-            empty.style.display = 'none';
-            const show = records.slice(0, MAX_HISTORY_DISPLAY);
-            let html = '';
-            for (const r of show) {
-                const timeStr = new Date(r.time).toLocaleTimeString('zh-CN', { hour12: false });
-                html += `<div class="history-item">
-                    <span class="h-time">${timeStr}</span>
-                    <span class="h-temp">${r.temperature.toFixed(1)}°C</span>
-                    <span class="h-humid">${r.humidity.toFixed(1)}%</span>
-                    <span class="h-batt">${r.battery}%</span>
-                    <span class="h-rssi">${r.rssi}</span>
-                </div>`;
-            }
-            list.innerHTML = html;
-            updateRecordCount();
-        }
-
-        async function refreshHistory() {
-            if (!db) return;
-            try {
-                const all = await loadAllRecords(db);
-                records = all;
-                renderHistory();
-            } catch (err) { log(`刷新历史失败: ${err.message}`, 'error'); }
-        }
-
-        // ----- 导出 CSV -----
-        function exportCSV() {
-            if (records.length === 0) {
-                showToast('⚠️ 没有数据可导出', 'error');
-                return;
-            }
-            const sorted = [...records].reverse();
-            const header = '时间,温度(°C),湿度(%),电量(%),RSSI(dBm)';
-            const rows = sorted.map(r => {
-                const time = new Date(r.time).toLocaleString('zh-CN', { hour12: false });
-                return `${time},${r.temperature.toFixed(1)},${r.humidity.toFixed(1)},${r.battery},${r.rssi}`;
-            });
-            const csv = [header, ...rows].join('\n');
-            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ble_data_${new Date().toISOString().slice(0,10)}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            log(`✅ 导出 ${records.length} 条记录`, 'success');
-            showToast(`✅ 导出 ${records.length} 条记录`, 'success');
-        }
-
-        // ----- Toast -----
-        let toastTimer = null;
-        function showToast(msg, type) {
-            toast.textContent = msg;
-            toast.className = 'toast';
-            if (type === 'error') toast.classList.add('error');
-            if (type === 'success') toast.classList.add('success');
-            toast.classList.add('show');
-            clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
-        }
-
-        // ----- 初始化 -----
-        async function init() {
-            try {
-                db = await openDB();
-                const all = await loadAllRecords(db);
-                records = all;
-                renderHistory();
-                if (records.length > 0) {
-                    const latest = records[0];
-                    updateMainDisplay(latest);
-                    lastData = latest;
-                }
-                log(`数据库加载成功，共 ${records.length} 条记录`, 'success');
-            } catch (err) {
-                log(`数据库初始化失败: ${err.message}，使用内存存储`, 'error');
-                showToast('⚠️ 存储初始化失败', 'error');
-            }
-
-            scanBtn.addEventListener('click', async () => {
-                if (isScanning) { stopScan(); return; }
-                await startScan();
-            });
-            exportBtn.addEventListener('click', exportCSV);
-            clearHistoryBtn.addEventListener('click', async () => {
-                if (records.length === 0) return showToast('没有历史可清空', '');
-                if (!confirm('确定清空所有历史记录？')) return;
-                try {
-                    if (db) await clearAllRecords(db);
-                    records = [];
-                    renderHistory();
-                    if (!isScanning) {
-                        noDataMsg.style.display = 'block';
-                        tempDisplay.textContent = '--';
-                        tempLabel.textContent = '等待数据';
-                        humidDisplay.innerHTML = '-- <span class="sub">%</span>';
-                        battDisplay.innerHTML = '-- <span class="sub">%</span>';
-                        rssiDisplay.innerHTML = '-- <span class="sub">dBm</span>';
-                        lastData = null;
-                    }
-                    log('🗑️ 已清空所有历史', 'success');
-                    showToast('🗑️ 已清空', 'success');
-                } catch (err) {
-                    log(`清空失败: ${err.message}`, 'error');
-                    showToast('清空失败', 'error');
-                }
-            });
-            clearLogBtn.addEventListener('click', clearLog);
-            window.addEventListener('beforeunload', () => { if (isScanning) try { navigator.bluetooth.stopLEScan(); } catch(e) {} });
-
-            updateScanUI(false);
-            if (records.length === 0) noDataMsg.style.display = 'block';
-            log('就绪，等待扫描...', 'info');
-            log('💡 默认使用 filter 方式，若收不到数据，可尝试开启「显示所有广播」', 'info');
-        }
-
-        document.addEventListener('DOMContentLoaded', init);
-        if (document.readyState === 'complete' || document.readyState === 'interactive') init();
-
-        console.log('🌡️ BLE 温湿度监测 – Filter 版 (更可靠)');
-    </script>
+init();
+</script>
 </body>
 </html>
